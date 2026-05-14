@@ -1,0 +1,8 @@
+com.project.sharist.app-pngs-0 /Users/rabin/AndroidStudioProjects/SharIST/app/build/generated/res/pngs/debug
+com.project.sharist.app-updated_navigation_xml-1 /Users/rabin/AndroidStudioProjects/SharIST/app/build/generated/updated_navigation_xml/debug
+com.project.sharist.app-packageDebugResources-2 /Users/rabin/AndroidStudioProjects/SharIST/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.project.sharist.app-packageDebugResources-3 /Users/rabin/AndroidStudioProjects/SharIST/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.project.sharist.app-debug-4 /Users/rabin/AndroidStudioProjects/SharIST/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.project.sharist.app-debug-5 /Users/rabin/AndroidStudioProjects/SharIST/app/src/debug/res
+com.project.sharist.app-main-6 /Users/rabin/AndroidStudioProjects/SharIST/app/src/main/res
+gradleHome-0 /Users/rabin/.gradle

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.ksp)
 }
 
 android {
@@ -55,4 +56,27 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    val navVersion = "2.9.8"
+    // Jetpack Compose integration
+    implementation("androidx.navigation:navigation-compose:$navVersion")
+    // Views/Fragments integration
+    implementation("androidx.navigation:navigation-fragment:$navVersion")
+    implementation("androidx.navigation:navigation-ui:$navVersion")
+    // Material UI Extended Icons
+    implementation("androidx.compose.material:material-icons-extended")
+
+    //viewmodel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation("androidx.compose.material:material-icons-extended")
+    testImplementation(libs.junit)
+    // Room
+    val roomVersion = "2.8.4"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    implementation("androidx.room:room-paging:$roomVersion")
+
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.accompanist:accompanist-permissions:0.37.3")
 }
