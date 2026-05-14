@@ -1,4 +1,4 @@
-package com.project.sharist.data.usecase
+package com.project.sharist.data.model
 
 data class RegisterUserInput (
     val email: String,

@@ -1,5 +1,7 @@
 package com.project.sharist.data.usecase
 
+import com.project.sharist.data.model.RegisterResult
+import com.project.sharist.data.model.RegisterUserInput
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.model.User
 import com.project.sharist.supabase
@@ -10,7 +12,7 @@ class RegisterUserUseCase(
     private val repository: UserRepository
 ) {
 
-    suspend operator fun invoke(data: RegisterUserInput) {
+    suspend operator fun invoke(data: RegisterUserInput) : RegisterResult {
 
         val authUser = supabase.auth.signUpWith(Email) {
             email = data.email
@@ -18,7 +20,7 @@ class RegisterUserUseCase(
         }
 
         val userId = authUser?.id
-            ?: throw IllegalStateException("User creation failed or is pending confirmation")
+            ?: return RegisterResult.Failure("User creation failed or is pending confirmation")
 
         val newUser = User(
             id = userId,
@@ -27,5 +29,6 @@ class RegisterUserUseCase(
         )
 
         repository.insert(newUser)
+        return RegisterResult.Success
     }
 }
