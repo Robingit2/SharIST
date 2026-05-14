@@ -14,7 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.project.sharist.data.local.DatabaseProvider
 import com.project.sharist.data.repository.UserRepository
-import com.project.sharist.domain.usecase.RegisterUserUseCase
+import com.project.sharist.data.usecase.RegisterUserUseCase
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import androidx.compose.ui.Alignment
@@ -28,7 +28,7 @@ fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
         DatabaseProvider.getDatabase(context)
     }
     val repository = remember {
-        UserRepository(database.userDao())
+        UserRepository()
     }
     val registerUserUseCase = remember {
         RegisterUserUseCase(repository)

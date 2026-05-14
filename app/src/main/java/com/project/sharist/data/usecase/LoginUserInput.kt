@@ -1,6 +1,6 @@
-package com.project.sharist.data.dto
+package com.project.sharist.data.usecase
 
-data class LoginUserDto (
+data class LoginUserInput (
     val email: String,
     val password: String
 )

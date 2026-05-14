@@ -1,21 +1,31 @@
-package com.project.sharist.domain.usecase
+package com.project.sharist.data.usecase
 
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.model.User
 import com.project.sharist.supabase
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
 
 class RegisterUserUseCase(
     private val repository: UserRepository
 ) {
 
-    suspend operator fun invoke(user: User) {
+    suspend operator fun invoke(data: RegisterUserInput) {
 
-        supabase.auth.signUpWith(Email) {
-            email = "valid.email@supabase.io"
-            password = "example-password"
+        val authUser = supabase.auth.signUpWith(Email) {
+            email = data.email
+            password = data.password
         }
 
-        repository.insert(user)
+        val userId = authUser?.id
+            ?: throw IllegalStateException("User creation failed or is pending confirmation")
+
+        val newUser = User(
+            id = userId,
+            name = data.name,
+            photoPath = data.photoPath
+        )
+
+        repository.insert(newUser)
     }
 }

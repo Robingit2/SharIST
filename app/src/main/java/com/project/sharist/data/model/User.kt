@@ -1,11 +1,14 @@
 package com.project.sharist.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
-// TODO Create ROOM model for local storage
+// TODO Separate supabase and room entities
 @Serializable
+@Entity(tableName = "users")
 data class User (
-    val id: String,
+    @PrimaryKey val id: String,
     val name: String,
-    val photoPath: String
+    val photoPath: String?
 )
