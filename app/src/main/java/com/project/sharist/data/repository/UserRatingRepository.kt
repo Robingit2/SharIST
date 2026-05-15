@@ -61,11 +61,14 @@ class UserRatingRepository {
         }
     }
 
-    suspend fun delete(ratingId: String) : GenericResult<Unit> {
+    suspend fun delete(raterId: String, targetId: String) : GenericResult<Unit> {
         return safeSupabaseCall {
             userRatingsTable.delete {
                 filter {
-                    eq("id", ratingId)
+                    and {
+                        eq("rater_user_id", raterId)
+                        eq("target_user_id", targetId)
+                    }
                 }
             }
         }
