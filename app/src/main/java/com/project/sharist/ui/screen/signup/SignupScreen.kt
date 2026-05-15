@@ -14,7 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import com.project.sharist.data.local.DatabaseProvider
 import com.project.sharist.data.repository.UserRepository
-import com.project.sharist.data.usecase.RegisterUserUseCase
+import com.project.sharist.data.usecase.auth.RegisterUserUseCase
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.widget.Toast
 import androidx.compose.ui.Alignment

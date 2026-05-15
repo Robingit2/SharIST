@@ -2,7 +2,7 @@ package com.project.sharist.ui.screen.signup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.project.sharist.data.usecase.RegisterUserUseCase
+import com.project.sharist.data.usecase.auth.RegisterUserUseCase
 
 class SignupViewModelFactory(private val registerUserUseCase: RegisterUserUseCase) : ViewModelProvider.Factory {
 

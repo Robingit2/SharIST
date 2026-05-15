@@ -1,4 +1,4 @@
-package com.project.sharist.data.model
+package com.project.sharist.data.model.auth
 
 data class LoginUserInput (
     val email: String,

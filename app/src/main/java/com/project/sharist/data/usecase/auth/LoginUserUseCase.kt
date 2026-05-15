@@ -1,9 +1,8 @@
-package com.project.sharist.data.usecase
+package com.project.sharist.data.usecase.auth
 
-import com.project.sharist.data.model.LoginResult
-import com.project.sharist.data.model.LoginUserInput
+import com.project.sharist.data.model.auth.LoginResult
+import com.project.sharist.data.model.auth.LoginUserInput
 import com.project.sharist.data.repository.UserRepository
-import com.project.sharist.data.model.User
 import com.project.sharist.supabase
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email

@@ -1,10 +1,10 @@
 package com.project.sharist.ui.screen.signup
 import com.project.sharist.data.repository.AuthRepository
-import com.project.sharist.data.usecase.RegisterUserUseCase
+import com.project.sharist.data.usecase.auth.RegisterUserUseCase
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
-import com.project.sharist.data.model.RegisterUserInput
+import com.project.sharist.data.model.auth.RegisterUserInput
 
 class SignupViewModel(private val registerUserUseCase: RegisterUserUseCase) : ViewModel() {
     private val repository = AuthRepository()

@@ -1,6 +1,6 @@
 package com.project.sharist.data.repository
 
-import com.project.sharist.data.model.User
+import com.project.sharist.data.model.user.User
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
 
