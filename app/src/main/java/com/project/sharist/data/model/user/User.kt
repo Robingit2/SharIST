@@ -12,5 +12,5 @@ data class User (
     @PrimaryKey val id: String,
     val name: String,
     val photoPath: String? = null,
-    val createdAt: Instant? = null
+    val createdAt: String? = null
 )

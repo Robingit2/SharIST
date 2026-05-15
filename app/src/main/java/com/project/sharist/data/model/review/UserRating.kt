@@ -13,5 +13,5 @@ data class UserRating (
     val rating: Int,
     val raterUserId: String,
     val targetUserId: String,
-    val createdAt: Instant? = null
+    val createdAt: String? = null
 )
