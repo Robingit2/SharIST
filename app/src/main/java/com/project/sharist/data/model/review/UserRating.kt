@@ -4,7 +4,6 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import java.util.UUID
-import kotlin.time.Instant
 
 @Serializable
 @Entity(tableName = "user_ratings")

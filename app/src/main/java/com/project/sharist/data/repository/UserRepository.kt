@@ -1,8 +1,6 @@
 package com.project.sharist.data.repository
 
 import com.project.sharist.data.model.GenericResult
-import com.project.sharist.data.model.error.AppError
-import com.project.sharist.data.model.error.NotFoundException
 import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.user.User
 import com.project.sharist.supabase

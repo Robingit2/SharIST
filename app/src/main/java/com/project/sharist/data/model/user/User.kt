@@ -3,7 +3,6 @@ package com.project.sharist.data.model.user
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
-import kotlin.time.Instant
 
 // TODO Separate supabase and room entities
 @Serializable
