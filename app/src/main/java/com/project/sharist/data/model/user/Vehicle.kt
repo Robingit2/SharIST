@@ -5,9 +5,11 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 @Serializable
-@Entity(tableName = "roles")
-data class Role (
+@Entity(tableName = "vehicles")
+data class Vehicle (
     val id: String = UUID.randomUUID().toString(),
-    val name: String,
+    val plate: String,
+    val photoPath: String? = null,
+    val userId: String,
     val createdAt: String? = null
 )

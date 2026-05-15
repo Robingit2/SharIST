@@ -8,10 +8,8 @@ import kotlinx.io.IOException
 fun Exception.toAppError(): AppError {
     return when (this) {
 
-        // Network issues (no internet, timeout, DNS, etc.)
         is IOException -> AppError.Network
 
-        // Ktor HTTP errors (used by Supabase Kotlin client under the hood)
         is ResponseException -> when (this.response.status.value) {
             401 -> AppError.Unauthorized
             403 -> AppError.Unauthorized
