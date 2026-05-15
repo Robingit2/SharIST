@@ -2,67 +2,67 @@ package com.project.sharist.data.repository
 
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.helpers.safeSupabaseCall
-import com.project.sharist.data.model.review.UserRating
+import com.project.sharist.data.model.review.UserComment
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
 
-class UserRatingRepository {
+class UserCommentRepository {
 
-    private val userRatingsTable = supabase.postgrest["user_ratings"]
+    private val userCommentsTable = supabase.postgrest["user_comments"]
 
-    suspend fun getRatingById(ratingId: String) : GenericResult<UserRating?> {
+    suspend fun getCommentById(commentId: String) : GenericResult<UserComment?> {
         return safeSupabaseCall {
-            userRatingsTable.select {
+            userCommentsTable.select {
                 filter {
-                    eq("id", ratingId)
+                    eq("id", commentId)
                 }
-            }.decodeSingleOrNull<UserRating>()
+            }.decodeSingleOrNull<UserComment>()
         }
     }
 
-    suspend fun getRatingByUsers(raterId: String, targetId: String) : GenericResult<UserRating?> {
+    suspend fun getCommentByUsers(raterId: String, targetId: String) : GenericResult<UserComment?> {
         return safeSupabaseCall {
-            userRatingsTable.select {
+            userCommentsTable.select {
                 filter {
                     and {
                         eq("rater_user_id", raterId)
                         eq("target_user_id", targetId)
                     }
                 }
-            }.decodeSingleOrNull<UserRating>()
+            }.decodeSingleOrNull<UserComment>()
         }
     }
 
-    suspend fun getRatingsByTarget(targetId: String) : GenericResult<List<UserRating>> {
+    suspend fun getCommentsByTarget(targetId: String) : GenericResult<List<UserComment>> {
         return safeSupabaseCall {
-            userRatingsTable.select {
+            userCommentsTable.select {
                 filter {
                     eq("target_user_id", targetId)
                 }
-            }.decodeList<UserRating>()
+            }.decodeList<UserComment>()
         }
     }
 
-    suspend fun getRatingsByRater(raterId: String) : GenericResult<List<UserRating>> {
+    suspend fun getCommentsByRater(raterId: String) : GenericResult<List<UserComment>> {
         return safeSupabaseCall {
-            userRatingsTable.select {
+            userCommentsTable.select {
                 filter {
                     eq("rater_user_id", raterId)
                 }
-            }.decodeList<UserRating>()
+            }.decodeList<UserComment>()
 
         }
     }
 
-    suspend fun upsert(rating: UserRating) : GenericResult<Unit> {
+    suspend fun upsert(comment: UserComment) : GenericResult<Unit> {
         return safeSupabaseCall {
-            userRatingsTable.upsert(rating)
+            userCommentsTable.upsert(comment)
         }
     }
 
     suspend fun delete(raterId: String, targetId: String) : GenericResult<Unit> {
         return safeSupabaseCall {
-            userRatingsTable.delete {
+            userCommentsTable.delete {
                 filter {
                     and {
                         eq("rater_user_id", raterId)
