@@ -11,101 +11,94 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.project.sharist.ui.screen.map.OpenStreetMapView
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(
+    role: String,
+    viewModel: HomeViewModel = viewModel()
+) {
 
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    val destination by viewModel.destination.collectAsState()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.fillMaxWidth(0.4f)
-                    .height(500.dp),
-                drawerContainerColor =
-                    MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-            ) {
+
+            ModalDrawerSheet {
 
                 Text(
-                    text = "Menu",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(16.dp)
+                    "Menu",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge
                 )
 
                 HorizontalDivider()
 
                 NavigationDrawerItem(
-                    label = { Text("View Profile") },
+                    label = { Text("Profile") },
                     selected = false,
-                    onClick = {
-                        //  profile
-                    }
+                    onClick = {}
                 )
-                NavigationDrawerItem(
-                    label = { Text("Notification") },
-                    selected = false,
-                    onClick = {
-                        //  settings
-                    }
-                )
-                NavigationDrawerItem(
-                    label = { Text("Dashboard") },
-                    selected = false,
-                    onClick = {
-                        //
-                    }
-                )
+
                 NavigationDrawerItem(
                     label = { Text("Settings") },
                     selected = false,
-                    onClick = {
-                        //  settings
-                    }
+                    onClick = {}
                 )
-
 
                 NavigationDrawerItem(
                     label = { Text("Logout") },
                     selected = false,
-                    onClick = {
-                        // logout
-                    }
+                    onClick = {}
                 )
             }
         }
     ) {
 
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Home") },
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    drawerState.open()
-                                }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = "Profile"
-                            )
-                        }
-                    }
+        Box(modifier = Modifier.fillMaxSize()) {
+
+            // MAP
+            OpenStreetMapView()
+
+            // PROFILE ICON (TOP RIGHT FLOATING)
+            FloatingActionButton(
+                onClick = {
+                    scope.launch { drawerState.open() }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    Icons.Default.AccountCircle,
+                    contentDescription = "Profile"
                 )
             }
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                OpenStreetMapView()
+
+            // RIDER UI
+            if (role == "RIDER") {
+                RiderSearchSection(
+                    destination = destination,
+                    onDestinationChange = viewModel::updateDestination,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                )
+            }
+
+            // DRIVER UI
+            if (role == "DRIVER") {
+                DriverRequestCard(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                )
             }
         }
     }

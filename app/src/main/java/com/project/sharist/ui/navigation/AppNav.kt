@@ -13,15 +13,19 @@ fun AppNav() {
 
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = Screen.Login.route) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Login.route
+    ) {
+
         composable(Screen.Login.route) {
             LoginScreen(
                 onSignupClick = {
                     navController.navigate(Screen.Signup.route)
                 },
                 onLoginSuccess = {
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
             )
@@ -37,11 +41,13 @@ fun AppNav() {
                         popUpTo(Screen.Signup.route) { inclusive = true }
                     }
                 }
-
             )
         }
+
         composable(Screen.Home.route) {
-            HomeScreen()
+            HomeScreen(
+                role = "DRIVER" // later dynamic
+            )
         }
     }
 }
