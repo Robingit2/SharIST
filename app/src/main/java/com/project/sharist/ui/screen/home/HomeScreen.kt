@@ -9,10 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
-import com.project.sharist.ui.screen.map.OpenStreetMapView
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 
+import com.project.sharist.ui.screen.map.OpenStreetMapView
+import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
+import com.project.sharist.ui.screen.ride_request.RideRequestScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,12 +25,9 @@ fun HomeScreen(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val destination by viewModel.destination.collectAsState()
-
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-
             ModalDrawerSheet {
 
                 Text(
@@ -37,8 +35,6 @@ fun HomeScreen(
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.titleLarge
                 )
-
-                HorizontalDivider()
 
                 NavigationDrawerItem(
                     label = { Text("Profile") },
@@ -62,11 +58,8 @@ fun HomeScreen(
     ) {
 
         Box(modifier = Modifier.fillMaxSize()) {
-
-            // MAP
             OpenStreetMapView()
 
-            // PROFILE ICON (TOP RIGHT FLOATING)
             FloatingActionButton(
                 onClick = {
                     scope.launch { drawerState.open() }
@@ -75,26 +68,20 @@ fun HomeScreen(
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
             ) {
-                Icon(
-                    Icons.Default.AccountCircle,
-                    contentDescription = "Profile"
-                )
+                Icon(Icons.Default.AccountCircle, contentDescription = null)
             }
 
-            // RIDER UI
             if (role == "RIDER") {
-                RiderSearchSection(
-                    destination = destination,
-                    onDestinationChange = viewModel::updateDestination,
+                RideRequestScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)
                 )
             }
 
-            // DRIVER UI
+
             if (role == "DRIVER") {
-                DriverRequestCard(
+                RideOfferScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(16.dp)

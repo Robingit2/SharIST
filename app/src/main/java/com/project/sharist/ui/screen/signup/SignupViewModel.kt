@@ -1,10 +1,10 @@
 package com.project.sharist.ui.screen.signup
 import com.project.sharist.data.repository.AuthRepository
-import com.project.sharist.domain.usecase.RegisterUserUseCase
+import com.project.sharist.data.usecase.auth.RegisterUserUseCase
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
-import com.project.sharist.domain.model.User
+import com.project.sharist.data.model.auth.RegisterUserInput
 
 class SignupViewModel(private val registerUserUseCase: RegisterUserUseCase) : ViewModel() {
     private val repository = AuthRepository()
@@ -14,16 +14,10 @@ class SignupViewModel(private val registerUserUseCase: RegisterUserUseCase) : Vi
         onSuccess: () -> Unit
     ) {
 
-        val user = User(
-            userRole = state.userRole,
-            vehicleNumber = state.vehicleNumber,
-            vehicleModel = state.vehicleModel,
-            email = state.email,
-            address = state.address,
-            fullName = state.fullName,
-            phone = state.phone,
-            document = state.identity_doc,
-            password = state.password
+        val user = RegisterUserInput(
+            email = "abc@gmail.com",
+            password = "password",
+            name = "John Doe",
         )
 
         viewModelScope.launch {
