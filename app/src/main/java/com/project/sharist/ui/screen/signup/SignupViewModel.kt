@@ -15,9 +15,10 @@ class SignupViewModel(private val registerUserUseCase: RegisterUserUseCase) : Vi
     ) {
 
         val user = RegisterUserInput(
-            email = "abc@gmail.com",
-            password = "password",
-            name = "John Doe",
+            email = state.email,
+            password = state.password,
+            name = state.fullName,
+            roles = state.userRoles
         )
 
         viewModelScope.launch {

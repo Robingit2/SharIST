@@ -58,7 +58,7 @@ fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
             )
 
             options.forEach { (title, subtitle) ->
-                val isSelected = state.userRole == title
+                val isSelected = title in state.userRoles
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -70,7 +70,13 @@ fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
                             MaterialTheme.colorScheme.surface
                     ),
                     onClick = {
-                        state = state.copy(userRole = title)
+                        val updatedRoles = if (isSelected) {
+                            state.userRoles - title
+                        } else {
+                            state.userRoles + title
+                        }
+
+                        state = state.copy(userRoles = updatedRoles)
                     },
                     elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                 ) {
@@ -200,7 +206,7 @@ fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
                 Text("Verify OTP")
             }
         }*/
-        if (state.step == 3 && state.userRole == "Driver") {
+        if (state.step == 3 && "Driver" in state.userRoles) {
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "Vehicle Details",
@@ -302,7 +308,7 @@ fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
                 OutlinedButton(
                     onClick = {
                         state = when {
-                            state.userRole == "Passenger" && state.step == 4 ->
+                            "Driver" !in state.userRoles && state.step == 4 ->
                                 state.copy(step = 2)
                             else ->
                                 state.copy(step = state.step - 1)
@@ -319,11 +325,22 @@ fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
                     onClick = {
                         state = when (state.step) {
                             // STEP 1 -> STEP 2
-                            1 -> state.copy(step = 2)
+                            1 -> {
+                                if (state.userRoles.isEmpty()) {
+                                    Toast.makeText(
+                                        context,
+                                        "Select at least one role",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    state
+                                } else {
+                                    state.copy(step = 2)
+                                }
+                            }
 
                             // STEP 2
                             2 -> {
-                                if (state.userRole == "Driver") {
+                                if ("Driver" in state.userRoles) {
                                     // Driver goes to vehicle details
                                     state.copy(step = 3)
                                 } else {

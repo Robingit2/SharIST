@@ -17,7 +17,5 @@ data class RideRequest(
     val toleranceBeforeMinutes: Int,
     val toleranceAfterMinutes: Int,
 
-    val passengers: Int,
-
     val recurringType: RecurringType
 )

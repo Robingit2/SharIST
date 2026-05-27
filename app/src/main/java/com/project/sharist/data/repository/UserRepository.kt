@@ -4,14 +4,16 @@ import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.model.user.User
+import com.project.sharist.data.model.user.UserRole
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.Serializable
 
 class UserRepository {
     // TODO Remove GenericResult
     private val usersTable = supabase.postgrest["users"]
-    private val userRolesTable = supabase.postgrest["roles"]
+    private val userRolesTable = supabase.postgrest["user_roles"]
 
     suspend fun getUser(userId: String): GenericResult<User> {
         return safeSupabaseCall {
@@ -33,9 +35,11 @@ class UserRepository {
         return roleNames.mapNotNull { RoleType.from(it) }
     }
 
-    suspend fun insert(user: User) : GenericResult<Unit> {
-        return safeSupabaseCall {
-            usersTable.insert(user)
+    suspend fun insert(user: User, userRoles: List<UserRole>) {
+        usersTable.insert(user)
+
+        if (userRoles.isNotEmpty()) {
+            userRolesTable.insert(userRoles)
         }
     }
 

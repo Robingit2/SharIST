@@ -22,7 +22,5 @@ data class RideRequestEntity(
     val toleranceBeforeMinutes: Int,
     val toleranceAfterMinutes: Int,
 
-    val passengers: Int,
-
     val recurringType: String
 )

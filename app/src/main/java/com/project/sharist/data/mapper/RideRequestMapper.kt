@@ -21,7 +21,6 @@ fun RideRequest.toEntity() = RideRequestEntity(
     toleranceBeforeMinutes = toleranceBeforeMinutes,
     toleranceAfterMinutes = toleranceAfterMinutes,
 
-    passengers = passengers,
     recurringType = recurringType.name
 )
 
@@ -39,6 +38,5 @@ fun RideRequestEntity.toDomain() = RideRequest(
     toleranceBeforeMinutes = toleranceBeforeMinutes,
     toleranceAfterMinutes = toleranceAfterMinutes,
 
-    passengers = passengers,
     recurringType = RecurringType.valueOf(recurringType)
 )

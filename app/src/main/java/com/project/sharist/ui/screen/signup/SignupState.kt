@@ -2,7 +2,7 @@ package com.project.sharist.ui.screen.signup
 
 data class SignupState(
     val step: Int = 1,
-    val userRole: String = "",
+    val userRoles: List<String> = emptyList<String>(),
     val fullName: String = "",
     val phone: String = "",
     val email: String = "",

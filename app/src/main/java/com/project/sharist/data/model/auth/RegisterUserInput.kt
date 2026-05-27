@@ -4,5 +4,6 @@ data class RegisterUserInput (
     val email: String,
     val password: String,
     val name: String,
-    val photoPath: String = ""
+    val photoPath: String = "",
+    val roles: List<String>
 )
