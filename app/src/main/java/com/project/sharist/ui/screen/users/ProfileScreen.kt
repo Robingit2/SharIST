@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,10 +29,16 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -51,11 +58,13 @@ fun ProfileScreen(
     profileUserId: String? = null,
     currentUserId: String? = null,
     viewModel: ProfileViewModel = viewModel(),
-    onEditProfileClick: () -> Unit,
+    editProfileViewModel: EditProfileViewModel = viewModel(),
     onSettingsClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val editUiState by editProfileViewModel.uiState.collectAsState()
+    var showEditDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(profileUserId, currentUserId) {
         if (profileUserId == null) {
@@ -68,12 +77,44 @@ fun ProfileScreen(
         }
     }
 
+    LaunchedEffect(editUiState.saved) {
+        if (editUiState.saved) {
+            showEditDialog = false
+            if (profileUserId == null) {
+                viewModel.loadCurrentUserProfile()
+            } else {
+                viewModel.loadProfile(
+                    userId = profileUserId,
+                    currentUserId = currentUserId
+                )
+            }
+        }
+    }
+
     ProfileContent(
         uiState = uiState,
-        onEditProfileClick = onEditProfileClick,
+        onEditProfileClick = {
+            uiState.user?.let { user ->
+                editProfileViewModel.startEditing(
+                    name = user.name,
+                    photoPath = user.photoPath
+                )
+                showEditDialog = true
+            }
+        },
         onSettingsClick = onSettingsClick,
         onLogoutClick = onLogoutClick
     )
+
+    if (showEditDialog) {
+        EditProfileDialog(
+            uiState = editUiState,
+            onNameChange = editProfileViewModel::onNameChange,
+            onPhotoPathChange = editProfileViewModel::onPhotoPathChange,
+            onSave = editProfileViewModel::saveProfile,
+            onDismiss = { showEditDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -233,6 +274,66 @@ private fun ProfileActions(
             )
         }
     }
+}
+
+@Composable
+private fun EditProfileDialog(
+    uiState: EditProfileUiState,
+    onNameChange: (String) -> Unit,
+    onPhotoPathChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit profile") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = uiState.name,
+                    onValueChange = onNameChange,
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = uiState.photoPath,
+                    onValueChange = onPhotoPathChange,
+                    label = { Text("Photo path") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                )
+
+                if (uiState.errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = uiState.errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onSave,
+                enabled = !uiState.isLoading
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !uiState.isLoading
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

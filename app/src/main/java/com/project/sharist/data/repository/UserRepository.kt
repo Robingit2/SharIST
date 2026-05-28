@@ -44,9 +44,8 @@ class UserRepository {
         }
     }
 
-    // FIXME create a UpdateDto instead of using Any
-    suspend fun update(userId: String, updates: Map<String, Any>) {
-        usersTable.update (updates) {
+    suspend fun updateProfile(userId: String, update: UserProfileUpdate) {
+        usersTable.update(update) {
             filter {
                 eq("id", userId)
             }
@@ -63,4 +62,11 @@ private data class UserRoleNameRow(
 @Serializable
 private data class RoleName(
     val name: String
+)
+
+@Serializable
+data class UserProfileUpdate(
+    val name: String,
+    @SerialName("photo_path")
+    val photoPath: String? = null
 )

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Divider
@@ -96,11 +97,20 @@ fun AppNav() {
     }
 
     val appContent: @Composable () -> Unit = {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+        ) {
             AppNavHost(
                 navController = navController,
                 activeRole = activeRole ?: userRoles.firstOrNull() ?: RoleType.PASSENGER,
-                onLogout = onLogout
+                onLogout = onLogout,
+                modifier = if (showDrawer && currentRoute != Screen.Home.route) {
+                    Modifier.padding(top = 60.dp)
+                } else {
+                    Modifier
+                }
             )
 
             if (showDrawer) {
@@ -121,6 +131,7 @@ fun AppNav() {
     if (showDrawer) {
         ModalNavigationDrawer(
             drawerState = drawerState,
+            gesturesEnabled = false,
             drawerContent = {
                 AppDrawerContent(
                     activeRole = activeRole,
@@ -159,11 +170,13 @@ fun AppNav() {
 private fun AppNavHost(
     navController: NavHostController,
     activeRole: RoleType,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route
+        startDestination = Screen.Login.route,
+        modifier = modifier
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
@@ -197,7 +210,6 @@ private fun AppNavHost(
 
         composable(Screen.Profile.route) {
             ProfileScreen(
-                onEditProfileClick = { navController.popBackStack() },
                 onSettingsClick = { navController.popBackStack() },
                 onLogoutClick = onLogout
             )
