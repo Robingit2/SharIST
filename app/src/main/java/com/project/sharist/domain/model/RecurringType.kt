@@ -1,8 +1,7 @@
 package com.project.sharist.domain.model
 
 enum class RecurringType {
-    NO,
+    NONE,
     DAILY,
     WEEKLY
 }
-

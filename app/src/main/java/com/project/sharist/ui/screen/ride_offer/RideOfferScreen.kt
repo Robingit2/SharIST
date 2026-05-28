@@ -100,6 +100,7 @@ fun RideOfferScreen(
         DateTimePickerRow(
             label = "Estimated arrival",
             selectedMillis = state.estimatedArrivalTimeMillis,
+            minMillis = state.departureTimeMillis,
             enabled = !state.isLoading,
             onSelected = viewModel::updateEstimatedArrivalTimeMillis
         )
@@ -167,6 +168,7 @@ fun RideOfferScreen(
 private fun DateTimePickerRow(
     label: String,
     selectedMillis: Long?,
+    minMillis: Long? = null,
     enabled: Boolean,
     onSelected: (Long) -> Unit
 ) {
@@ -190,6 +192,7 @@ private fun DateTimePickerRow(
                     showDateTimePicker(
                         context = context,
                         initialMillis = selectedMillis,
+                        minMillis = minMillis,
                         onSelected = onSelected
                     )
                 },
@@ -256,13 +259,14 @@ private fun AddressSection(
 private fun showDateTimePicker(
     context: Context,
     initialMillis: Long?,
+    minMillis: Long? = null,
     onSelected: (Long) -> Unit
 ) {
     val calendar = Calendar.getInstance().apply {
         timeInMillis = initialMillis ?: System.currentTimeMillis()
     }
 
-    DatePickerDialog(
+    val datePickerDialog = DatePickerDialog(
         context,
         { _, year, month, dayOfMonth ->
             calendar.set(Calendar.YEAR, year)
@@ -276,6 +280,14 @@ private fun showDateTimePicker(
                     calendar.set(Calendar.MINUTE, minute)
                     calendar.set(Calendar.SECOND, 0)
                     calendar.set(Calendar.MILLISECOND, 0)
+                    if (minMillis != null && calendar.timeInMillis <= minMillis) {
+                        Toast.makeText(
+                            context,
+                            "Arrival must be after departure.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@TimePickerDialog
+                    }
                     onSelected(calendar.timeInMillis)
                 },
                 calendar.get(Calendar.HOUR_OF_DAY),
@@ -286,7 +298,13 @@ private fun showDateTimePicker(
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
-    ).show()
+    )
+
+    minMillis?.let {
+        datePickerDialog.datePicker.minDate = it
+    }
+
+    datePickerDialog.show()
 }
 
 private fun Long.formatDateTime(): String {

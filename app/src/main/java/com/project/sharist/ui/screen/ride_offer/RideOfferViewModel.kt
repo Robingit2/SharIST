@@ -31,7 +31,17 @@ class RideOfferViewModel(
     fun updateArrivalAddress(value: String) = _state.update { it.copy(arrivalAddress = value, saved = false) }
     fun updateArrivalLat(value: String) = _state.update { it.copy(arrivalLat = value, saved = false) }
     fun updateArrivalLng(value: String) = _state.update { it.copy(arrivalLng = value, saved = false) }
-    fun updateDepartureTimeMillis(value: Long) = _state.update { it.copy(departureTimeMillis = value, saved = false) }
+    fun updateDepartureTimeMillis(value: Long) {
+        _state.update {
+            it.copy(
+                departureTimeMillis = value,
+                estimatedArrivalTimeMillis = it.estimatedArrivalTimeMillis?.takeIf { arrival ->
+                    arrival > value
+                },
+                saved = false
+            )
+        }
+    }
     fun updateEstimatedArrivalTimeMillis(value: Long) = _state.update { it.copy(estimatedArrivalTimeMillis = value, saved = false) }
     fun updateCost(value: String) = _state.update { it.copy(cost = value, saved = false) }
     fun updateVehicleCapacity(value: String) = _state.update { it.copy(vehicleCapacity = value, saved = false) }
