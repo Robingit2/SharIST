@@ -31,15 +31,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.usecase.auth.LogoutUserUseCase
 import com.project.sharist.supabase
 import com.project.sharist.ui.navigation.Navigation.Screen
+import com.project.sharist.ui.screen.available_rides.AvailableRidesScreen
 import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
 import com.project.sharist.ui.screen.ride_offer.MyRideOffersScreen
@@ -133,11 +136,17 @@ fun AppNav() {
     if (showDrawer) {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            gesturesEnabled = false,
+            gesturesEnabled = drawerState.isOpen,
             drawerContent = {
                 AppDrawerContent(
                     activeRole = activeRole,
                     userRoles = userRoles,
+                    onHomeClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.Home.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onProfileClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.Profile.route)
@@ -153,7 +162,10 @@ fun AppNav() {
                         navController.navigate(Screen.MyRideOffers.route)
                     },
                     onReservationsClick = { scope.launch { drawerState.close() } },
-                    onAvailableRidesClick = { scope.launch { drawerState.close() } },
+                    onAvailableRidesClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.AvailableRides.route)
+                    },
                     onSwitchRoleClick = { role ->
                         activeRole = role
                         scope.launch { drawerState.close() }
@@ -225,6 +237,19 @@ private fun AppNavHost(
             )
         }
 
+        composable(
+            route = "${Screen.Profile.route}/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { entry ->
+            val userId = entry.arguments?.getString("userId")
+            ProfileScreen(
+                profileUserId = userId,
+                currentUserId = supabase.auth.currentUserOrNull()?.id,
+                onSettingsClick = { navController.popBackStack() },
+                onLogoutClick = onLogout
+            )
+        }
+
         composable(Screen.MyVehicles.route) {
             MyVehiclesScreen()
         }
@@ -240,6 +265,14 @@ private fun AppNavHost(
         composable(Screen.MyRideOffers.route) {
             MyRideOffersScreen()
         }
+
+        composable(Screen.AvailableRides.route) {
+            AvailableRidesScreen(
+                onDriverClick = { driverId ->
+                    navController.navigate("${Screen.Profile.route}/$driverId")
+                }
+            )
+        }
     }
 }
 
@@ -254,6 +287,7 @@ private fun NavOptionsBuilder.clearBackStack() {
 private fun AppDrawerContent(
     activeRole: RoleType?,
     userRoles: List<RoleType>,
+    onHomeClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onHistoryClick: () -> Unit,
@@ -271,6 +305,7 @@ private fun AppDrawerContent(
             style = MaterialTheme.typography.titleLarge
         )
 
+        DrawerItem("Home", onHomeClick)
         DrawerItem("Profile", onProfileClick)
         DrawerItem("Settings", onSettingsClick)
         DrawerItem("History", onHistoryClick)
