@@ -13,9 +13,7 @@ data class RideRequest(
     val arrivalRadiusMeters: Double,
 
     val desiredDepartureTimeMillis: Long,
-
-    val toleranceBeforeMinutes: Int,
-    val toleranceAfterMinutes: Int,
+    val departureToleranceMinutes: Int,
 
     val recurringType: RecurringType
 )

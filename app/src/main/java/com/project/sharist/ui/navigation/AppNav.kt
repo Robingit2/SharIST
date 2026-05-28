@@ -42,6 +42,8 @@ import com.project.sharist.supabase
 import com.project.sharist.ui.navigation.Navigation.Screen
 import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
+import com.project.sharist.ui.screen.ride_offer.MyRideOffersScreen
+import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
 import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.users.ProfileScreen
 import com.project.sharist.ui.screen.vehicles.MyVehiclesScreen
@@ -146,7 +148,10 @@ fun AppNav() {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.MyVehicles.route)
                     },
-                    onMyOffersClick = { scope.launch { drawerState.close() } },
+                    onMyOffersClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.MyRideOffers.route)
+                    },
                     onReservationsClick = { scope.launch { drawerState.close() } },
                     onAvailableRidesClick = { scope.launch { drawerState.close() } },
                     onSwitchRoleClick = { role ->
@@ -205,7 +210,12 @@ private fun AppNavHost(
         }
 
         composable(Screen.Home.route) {
-            HomeScreen(role = activeRole)
+            HomeScreen(
+                role = activeRole,
+                onCreateRideOfferClick = {
+                    navController.navigate(Screen.RideOffer.route)
+                }
+            )
         }
 
         composable(Screen.Profile.route) {
@@ -217,6 +227,18 @@ private fun AppNavHost(
 
         composable(Screen.MyVehicles.route) {
             MyVehiclesScreen()
+        }
+
+        composable(Screen.RideOffer.route) {
+            RideOfferScreen(
+                onRideOfferSaved = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.MyRideOffers.route) {
+            MyRideOffersScreen()
         }
     }
 }
@@ -260,7 +282,7 @@ private fun AppDrawerContent(
         when (activeRole) {
             RoleType.DRIVER -> {
                 DrawerItem("My vehicles", onMyVehiclesClick)
-                DrawerItem("My offers", onMyOffersClick)
+                DrawerItem("My Ride offers", onMyOffersClick)
 
                 if (RoleType.PASSENGER in userRoles) {
                     DrawerItem("Switch to passenger") {

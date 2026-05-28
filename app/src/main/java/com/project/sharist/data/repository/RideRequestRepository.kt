@@ -1,14 +1,26 @@
 package com.project.sharist.data.repository
 
-import com.project.sharist.data.local.RideRequestDao
 import com.project.sharist.data.model.ride.RideRequestEntity
+import com.project.sharist.supabase
+import io.github.jan.supabase.postgrest.postgrest
 
-class RideRequestRepository(
-    private val dao: RideRequestDao
-) {
+class RideRequestRepository {
 
-    suspend fun insert(request: RideRequestEntity) =
-        dao.insert(request)
+    private val rideRequestsTable = supabase.postgrest["ride_requests"]
 
-    fun getRequests() = dao.getAll()
+    suspend fun insert(request: RideRequestEntity) {
+        rideRequestsTable.insert(request)
+    }
+
+    suspend fun getRequests(): List<RideRequestEntity> {
+        return rideRequestsTable.select().decodeList()
+    }
+
+    suspend fun delete(requestId: String) {
+        rideRequestsTable.delete {
+            filter {
+                eq("id", requestId)
+            }
+        }
+    }
 }

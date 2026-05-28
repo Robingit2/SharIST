@@ -2,6 +2,7 @@ package com.project.sharist.domain.model
 
 data class RideOffer(
     val id: String,
+    val driverId: String,
 
     val departure: LatLng,
     val arrival: LatLng,

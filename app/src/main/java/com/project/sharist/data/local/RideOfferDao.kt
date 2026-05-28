@@ -12,4 +12,7 @@ interface RideOfferDao {
 
     @Query("SELECT * FROM ride_offers")
     fun getAll(): Flow<List<RideOfferEntity>>
+
+    @Delete
+    suspend fun delete(offer: RideOfferEntity)
 }

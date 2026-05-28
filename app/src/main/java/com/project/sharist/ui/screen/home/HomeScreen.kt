@@ -10,13 +10,13 @@ import androidx.compose.ui.Alignment
 
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.ui.screen.map.OpenStreetMapView
-import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
 import com.project.sharist.ui.screen.ride_request.RideRequestScreen
 
 @Composable
 fun HomeScreen(
     role: RoleType,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    onCreateRideOfferClick: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         OpenStreetMapView()
@@ -30,11 +30,15 @@ fun HomeScreen(
         }
 
         if (role == RoleType.DRIVER) {
-            RideOfferScreen(
+            Button(
+                onClick = onCreateRideOfferClick,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
-            )
+                    .fillMaxWidth()
+            ) {
+                Text("Create ride offer")
+            }
         }
     }
 }
