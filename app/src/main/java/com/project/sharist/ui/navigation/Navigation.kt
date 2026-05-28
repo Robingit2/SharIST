@@ -7,5 +7,6 @@ class Navigation {
         object Home : Screen("home")
 
         object Profile : Screen("profile")
+        object MyVehicles : Screen("my_vehicles")
     }
 }

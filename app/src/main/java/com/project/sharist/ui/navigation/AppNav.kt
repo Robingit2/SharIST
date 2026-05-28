@@ -43,6 +43,7 @@ import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
 import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.users.ProfileScreen
+import com.project.sharist.ui.screen.vehicles.MyVehiclesScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
@@ -130,7 +131,10 @@ fun AppNav() {
                     },
                     onSettingsClick = { scope.launch { drawerState.close() } },
                     onHistoryClick = { scope.launch { drawerState.close() } },
-                    onMyVehiclesClick = { scope.launch { drawerState.close() } },
+                    onMyVehiclesClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.MyVehicles.route)
+                    },
                     onMyOffersClick = { scope.launch { drawerState.close() } },
                     onReservationsClick = { scope.launch { drawerState.close() } },
                     onAvailableRidesClick = { scope.launch { drawerState.close() } },
@@ -197,6 +201,10 @@ private fun AppNavHost(
                 onSettingsClick = { navController.popBackStack() },
                 onLogoutClick = onLogout
             )
+        }
+
+        composable(Screen.MyVehicles.route) {
+            MyVehiclesScreen()
         }
     }
 }

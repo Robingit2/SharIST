@@ -21,7 +21,7 @@ class VehicleRepository {
             filter {
                 eq("user_id", userId)
             }
-        }.decodeSingle()
+        }.decodeList()
     }
 
     suspend fun insert(vehicle: Vehicle) {
@@ -31,7 +31,7 @@ class VehicleRepository {
     suspend fun update(vehicleId: String, updates: Map<String, Any>) {
         vehiclesTable.update(updates) {
             filter {
-                eq("vehicle_id", vehicleId)
+                eq("id", vehicleId)
             }
         }
     }
