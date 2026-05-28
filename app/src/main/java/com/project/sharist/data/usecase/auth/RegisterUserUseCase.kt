@@ -24,7 +24,9 @@ class RegisterUserUseCase(
             }
 
             val authUser = supabase.auth.currentUserOrNull()
-                ?: throw AuthException()
+                ?: throw AuthException(
+                    "Account was created, but Supabase did not return a logged in user"
+                )
 
             val newUser = User(
                 id = authUser.id,

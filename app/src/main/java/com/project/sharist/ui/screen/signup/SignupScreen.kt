@@ -1,400 +1,170 @@
 package com.project.sharist.ui.screen.signup
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-
-
-import androidx.compose.ui.platform.LocalContext
-import com.project.sharist.data.local.DatabaseProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.usecase.auth.RegisterUserUseCase
-import androidx.lifecycle.viewmodel.compose.viewModel
-import android.widget.Toast
-import androidx.compose.ui.Alignment
 
 @Composable
-fun SignupScreen(onLoginClick: () -> Unit, onSignupComplete: () -> Unit) {
-
-
+fun SignupScreen(
+    onLoginClick: () -> Unit,
+    onSignupComplete: () -> Unit
+) {
     val context = LocalContext.current
-    val database = remember {
-        DatabaseProvider.getDatabase(context)
-    }
-    val repository = remember {
-        UserRepository()
-    }
     val registerUserUseCase = remember {
-        RegisterUserUseCase(repository)
+        RegisterUserUseCase(UserRepository())
     }
     val viewModel: SignupViewModel = viewModel(
         factory = SignupViewModelFactory(registerUserUseCase)
     )
+
     var state by remember { mutableStateOf(SignupState()) }
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
+        Text("Sign up", style = MaterialTheme.typography.headlineLarge)
 
-        if (state.step == 1) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "How do you want to use the app?",
-                style = MaterialTheme.typography.headlineSmall
-            )
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-            val options = listOf(
-                "Passenger" to "Book rides quickly and safely",
-                "Driver" to "Earn money by driving"
-            )
+        OutlinedTextField(
+            value = state.name,
+            onValueChange = { state = state.copy(name = it) },
+            label = { Text("Name") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        )
 
-            options.forEach { (title, subtitle) ->
-                val isSelected = title in state.userRoles
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.surface
-                    ),
-                    onClick = {
-                        val updatedRoles = if (isSelected) {
-                            state.userRoles - title
-                        } else {
-                            state.userRoles + title
-                        }
+        Spacer(modifier = Modifier.height(8.dp))
 
-                        state = state.copy(userRoles = updatedRoles)
-                    },
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+        OutlinedTextField(
+            value = state.email,
+            onValueChange = { state = state.copy(email = it) },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        )
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium
-                            )
+        Spacer(modifier = Modifier.height(8.dp))
 
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (isSelected) {
-                            Text(
-                                text = "✓",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        if (state.step == 2) {
+        OutlinedTextField(
+            value = state.password,
+            onValueChange = { state = state.copy(password = it) },
+            label = { Text("Password") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        )
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Tell us about yourself",
-                style = MaterialTheme.typography.headlineSmall
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            // Full Name
-            OutlinedTextField(
-                value = state.fullName,
-                onValueChange = {
-                    state = state.copy(fullName = it)
-                },
-                label = { Text("Full Name") },
-                modifier = Modifier.fillMaxWidth()
-            )
+        Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-            // Phone Number
-            OutlinedTextField(
-                value = state.phone,
-                onValueChange = {
-                    state = state.copy(phone = it)
-                },
-                label = { Text("Phone Number") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = state.photoPath,
+            onValueChange = { state = state.copy(photoPath = it) },
+            label = { Text("Photo path") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        )
 
-            OutlinedTextField(
-                value = state.address,
-                onValueChange = { state = state.copy(address = it) },
-                label = { Text("Address") },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        /*
-        if (state.step == 3) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Verify your email.",
-                style = MaterialTheme.typography.headlineSmall
-            )
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = state.email,
-                onValueChange = {
-                    state = state.copy(fullName = it)
-                },
-                label = { Text("Enter your email") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Button(
-                onClick = {
-                    sendOtpToEmail(state.email)
-                    state = state.copy(step = 4)
-                }
+        Text("Roles", style = MaterialTheme.typography.titleMedium)
+
+        RoleType.entries.forEach { role ->
+            val roleName = role.name.lowercase()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Send OTP")
-            }
-        }
-        if (state.step == 4) {
-            Text(text = "Enter OTP sent to your email", style = MaterialTheme.typography.headlineSmall)
-
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = state.otp,
-                onValueChange = {
-                    state = state.copy(otp = it)
-                },
-                label = { Text("Enter OTP") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Button(
-                onClick = {
-                    verifyOtp(
-                        email = state.email,
-                        otp = state.otp,
-                        onSuccess = {
-                            state = state.copy(
-                                isEmailVerified = true,
-                                step = 5
-                            )
-                        },
-                        onFailure = {
-                            // show error
-                        }
-                    )
-                }
-            ) {
-                Text("Verify OTP")
-            }
-        }*/
-        if (state.step == 3 && "Driver" in state.userRoles) {
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Vehicle Details",
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = state.vehicleNumber,
-                onValueChange = {
-                    state = state.copy(vehicleNumber = it)
-                },
-                label = { Text("Vehicle Number") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = state.vehicleModel,
-                onValueChange = {
-                    state = state.copy(vehicleModel = it)
-                },
-                label = { Text("Vehicle Model") },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (state.step == 4) {
-            OutlinedTextField(
-                value = state.email,
-                onValueChange = { state = state.copy(email = it) },
-                label = { Text("Email") },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (state.step == 5) {
-            var selectedFileName by remember { mutableStateOf("") }
-            val launcher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.OpenDocument()
-            ) { uri: Uri? ->
-                uri?.let {
-                    selectedFileName = it.lastPathSegment ?: "Document Selected"
-                    // Save URI or filename in state
-                    state = state.copy(identity_doc = it.toString())
-                }
-            }
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedTextField(
-                    value = selectedFileName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Identity Document") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Button(
-                    onClick = {
-                        launcher.launch(
-                            arrayOf(
-                                "application/pdf",
-                                "image/*"
-                            )
+                Checkbox(
+                    checked = roleName in state.roles,
+                    onCheckedChange = { checked ->
+                        state = state.copy(
+                            roles = if (checked) {
+                                state.roles + roleName
+                            } else {
+                                state.roles - roleName
+                            }
                         )
-                    }
-                ) {
-                    Text("Choose Document")
-                }
+                    },
+                    enabled = !isLoading
+                )
+                Text(roleName.replaceFirstChar { it.titlecase() })
             }
         }
-
-        if (state.step == 6) {
-            OutlinedTextField(
-                value = state.password,
-                onValueChange = { state = state.copy(password = it) },
-                label = { Text("Create Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = state.confirmpassword,
-                onValueChange = { state = state.copy(confirmpassword = it) },
-                label = { Text("Retype your password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
 
         Spacer(modifier = Modifier.height(20.dp))
-        Row( modifier = Modifier.fillMaxWidth(),  horizontalArrangement = Arrangement.SpaceBetween) {
-            // BACK BUTTON
-            if (state.step > 1) {
-                OutlinedButton(
-                    onClick = {
-                        state = when {
-                            "Driver" !in state.userRoles && state.step == 4 ->
-                                state.copy(step = 2)
-                            else ->
-                                state.copy(step = state.step - 1)
-                        }
-                    }
-                ) {
-                    Text("Back")
-                }
-            }
 
-            // NEXT BUTTON
-            if (state.step < 6) {
-                Button(
-                    onClick = {
-                        state = when (state.step) {
-                            // STEP 1 -> STEP 2
-                            1 -> {
-                                if (state.userRoles.isEmpty()) {
-                                    Toast.makeText(
-                                        context,
-                                        "Select at least one role",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    state
-                                } else {
-                                    state.copy(step = 2)
-                                }
-                            }
-
-                            // STEP 2
-                            2 -> {
-                                if ("Driver" in state.userRoles) {
-                                    // Driver goes to vehicle details
-                                    state.copy(step = 3)
-                                } else {
-                                    // Passenger skips step 3
-                                    state.copy(step = 4)
-                                }
-                            }
-                            // Driver vehicle details -> step 4
-                            3 -> state.copy(step = 4)
-                            // Continue remaining steps
-                            4 -> state.copy(step = 5)
-                            5 -> state.copy(step = 6)
-                            else -> state
-                        }
+        Button(
+            onClick = {
+                viewModel.registerUser(
+                    state = state,
+                    onSuccess = {
+                        Toast.makeText(
+                            context,
+                            "Account created successfully",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        onSignupComplete()
                     }
-                ) {
-                    Text("Next")
-                }
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator()
             } else {
-                // FINAL BUTTON
-                Button(
-                    onClick = {
-                        if (state.password == state.confirmpassword) {
-                            viewModel.registerUser(
-                                state = state,
-                                onSuccess = {
-                                    Toast.makeText(
-                                        context,
-                                        "Account Created Successfully",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    // Navigate to Login
-                                    onLoginClick()
-                                }
-                            )
-
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "Passwords do not match",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                ) {
-                    Text("Create Account")
-                }
+                Text("Create account")
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        TextButton(onClick = onLoginClick) {
-            Text("Already have account? Login")
+        TextButton(
+            onClick = onLoginClick,
+            enabled = !isLoading
+        ) {
+            Text("Already have an account? Login")
         }
     }
 }

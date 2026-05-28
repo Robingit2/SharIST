@@ -9,16 +9,15 @@ fun Exception.toAppError(): AppError {
     return when (this) {
 
         is IOException -> AppError.Network
-
         is ResponseException -> when (this.response.status.value) {
             401 -> AppError.Unauthorized
             403 -> AppError.Unauthorized
             404 -> AppError.NotFound
             409 -> AppError.Conflict
-            else -> AppError.Unknown
+            else -> AppError.Unknown(message)
         }
 
-        else -> AppError.Unknown
+        else -> AppError.Unknown(message)
     }
 }
 

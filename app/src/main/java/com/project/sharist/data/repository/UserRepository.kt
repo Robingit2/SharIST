@@ -8,6 +8,7 @@ import com.project.sharist.data.model.user.UserRole
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 class UserRepository {
@@ -26,13 +27,13 @@ class UserRepository {
     }
 
     suspend fun getUserRoles(userId: String): List<RoleType> {
-        val roleNames = userRolesTable.select(Columns.raw("roles (name)")) {
+        val roleRows = userRolesTable.select(Columns.raw("roles (name)")) {
             filter {
                 eq("user_id", userId)
             }
-        } .decodeList<String>()
+        }.decodeList<UserRoleNameRow>()
 
-        return roleNames.mapNotNull { RoleType.from(it) }
+        return roleRows.mapNotNull { RoleType.from(it.role.name) }
     }
 
     suspend fun insert(user: User, userRoles: List<UserRole>) {
@@ -52,3 +53,14 @@ class UserRepository {
         }
     }
 }
+
+@Serializable
+private data class UserRoleNameRow(
+    @SerialName("roles")
+    val role: RoleName
+)
+
+@Serializable
+private data class RoleName(
+    val name: String
+)

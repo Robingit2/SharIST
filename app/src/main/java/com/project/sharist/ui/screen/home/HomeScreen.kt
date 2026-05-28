@@ -19,7 +19,8 @@ import com.project.sharist.ui.screen.ride_request.RideRequestScreen
 @Composable
 fun HomeScreen(
     role: String,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    onProfileClick: () -> Unit
 ) {
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -39,7 +40,7 @@ fun HomeScreen(
                 NavigationDrawerItem(
                     label = { Text("Profile") },
                     selected = false,
-                    onClick = {}
+                    onClick = { onProfileClick() }
                 )
 
                 NavigationDrawerItem(

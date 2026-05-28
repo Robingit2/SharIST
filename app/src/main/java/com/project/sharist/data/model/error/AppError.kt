@@ -5,5 +5,5 @@ sealed class AppError {
     data object Conflict : AppError()
     data object Unauthorized : AppError()
     data object NotFound : AppError()
-    data object Unknown : AppError()
+    data class Unknown(val message: String? = null) : AppError()
 }

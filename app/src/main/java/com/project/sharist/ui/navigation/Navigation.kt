@@ -5,5 +5,7 @@ class Navigation {
         object Login : Screen("login")
         object Signup : Screen("signup")
         object Home : Screen("home")
+
+        object Profile : Screen("profile")
     }
 }

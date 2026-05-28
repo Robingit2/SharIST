@@ -8,6 +8,8 @@ import com.project.sharist.ui.navigation.Navigation.Screen
 import com.project.sharist.ui.screen.login.LoginScreen
 import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.home.HomeScreen
+import com.project.sharist.ui.screen.users.ProfileScreen
+
 @Composable
 fun AppNav() {
 
@@ -46,7 +48,18 @@ fun AppNav() {
 
         composable(Screen.Home.route) {
             HomeScreen(
-                role = "DRIVER" // later dynamic
+                role = "DRIVER", // later dynamic
+                onProfileClick = {
+                    navController.navigate(Screen.Profile.route)
+                }
+            )
+        }
+
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                onEditProfileClick = { navController.popBackStack() },
+                onSettingsClick = { navController.popBackStack() },
+                onLogoutClick = { navController.popBackStack() },
             )
         }
     }
