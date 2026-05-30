@@ -11,15 +11,18 @@ import androidx.compose.ui.Alignment
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.ui.screen.map.OpenStreetMapView
 import com.project.sharist.ui.screen.ride_request.RideRequestScreen
-
+import com.project.sharist.ui.screen.weather.WeatherViewModel
 @Composable
 fun HomeScreen(
     role: RoleType,
     viewModel: HomeViewModel = viewModel(),
+    weatherViewModel: WeatherViewModel = viewModel(),
     onCreateRideOfferClick: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        OpenStreetMapView()
+        OpenStreetMapView(
+            weatherViewModel = weatherViewModel
+        )
 
         if (role == RoleType.PASSENGER) {
             RideRequestScreen(

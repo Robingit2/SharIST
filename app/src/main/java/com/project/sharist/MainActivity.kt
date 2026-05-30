@@ -30,19 +30,71 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+/*import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Location
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.project.sharist.ui.screen.weather.WeatherScreen
+import com.project.sharist.ui.screen.weather.WeatherViewModel
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SharISTTheme {
-        Greeting("Android")
+class MainActivity : ComponentActivity() {
+
+    private val viewModel = WeatherViewModel()
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private val permissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            if (isGranted) {
+                getLocation()
+            }
+        }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        fusedLocationClient =
+            LocationServices.getFusedLocationProviderClient(this)
+
+        checkLocationPermission()
+
+        setContent {
+            WeatherScreen(viewModel)
+        }
     }
-}
+
+    private fun checkLocationPermission() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                getLocation()
+            }
+
+            else -> {
+                permissionLauncher.launch(
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+            }
+        }
+    }
+
+    private fun getLocation() {
+        try {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                location?.let {
+                    viewModel.loadWeather(it.latitude, it.longitude)
+                }
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
+    }
+}*/
