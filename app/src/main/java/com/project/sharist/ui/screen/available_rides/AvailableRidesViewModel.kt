@@ -195,9 +195,8 @@ class AvailableRidesViewModel : ViewModel() {
         }
     }
 
-    // TODO do filtering
     private suspend fun loadAvailableRides(filter: RideRequest): List<RideOffer> {
-        return rideOfferRepository.getOffers().map { it.toDomain() }
+        return rideOfferRepository.getOffers(filter).map { it.toDomain() }
     }
 
     private suspend fun loadDriverNames(offers: List<RideOffer>): Map<String, String> {
