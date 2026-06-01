@@ -1,5 +1,7 @@
 package com.project.sharist.ui.screen.users
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
@@ -74,7 +76,7 @@ class EditProfileViewModel(
         _uiState.update { it.copy(photoPath = photoPath, saved = false) }
     }
 
-    fun saveProfile() {
+    fun saveProfile(context: Context) {
         val userId = supabase.auth.currentUserOrNull()?.id
         val state = _uiState.value
 
@@ -92,11 +94,18 @@ class EditProfileViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null, saved = false) }
 
             try {
+                val photoPath = state.photoPath.trim()
+                val savedPhotoPath = if (photoPath.startsWith("content://")) {
+                    userRepository.uploadAvatar(context, userId, Uri.parse(photoPath))
+                } else {
+                    photoPath.takeIf { it.isNotEmpty() }
+                }
+
                 userRepository.updateProfile(
                     userId = userId,
                     update = UserProfileUpdate(
                         name = state.name.trim(),
-                        photoPath = state.photoPath.trim().takeIf { it.isNotEmpty() }
+                        photoPath = savedPhotoPath
                     )
                 )
                 _uiState.update { it.copy(isLoading = false, saved = true) }

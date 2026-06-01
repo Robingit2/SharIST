@@ -1,5 +1,11 @@
 package com.project.sharist.ui.screen.users
 
+import android.content.Intent
+import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
@@ -42,6 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,6 +76,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val editUiState by editProfileViewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showEditDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(profileUserId, currentUserId) {
@@ -116,7 +128,7 @@ fun ProfileScreen(
             uiState = editUiState,
             onNameChange = editProfileViewModel::onNameChange,
             onPhotoPathChange = editProfileViewModel::onPhotoPathChange,
-            onSave = editProfileViewModel::saveProfile,
+            onSave = { editProfileViewModel.saveProfile(context) },
             onDismiss = { showEditDialog = false }
         )
     }
@@ -185,7 +197,10 @@ private fun ProfileLoadedContent(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ProfileHeader(user = uiState.user!!)
+        ProfileHeader(
+            user = uiState.user!!,
+            avatarBytes = uiState.avatarBytes
+        )
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -249,16 +264,39 @@ private fun ProfileLoadedContent(
 }
 
 @Composable
-private fun ProfileHeader(user: User) {
+private fun ProfileHeader(
+    user: User,
+    avatarBytes: ByteArray?
+) {
+    val avatarBitmap = remember(avatarBytes) {
+        avatarBytes
+            ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            ?.asImageBitmap()
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Default.AccountCircle,
-            contentDescription = "Profile picture",
-            modifier = Modifier.size(112.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
+        if (avatarBitmap != null) {
+            Image(
+                bitmap = avatarBitmap,
+                contentDescription = "Profile picture",
+                modifier = Modifier
+                    .size(112.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = "Profile picture",
+                modifier = Modifier
+                    .size(112.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -321,6 +359,19 @@ private fun EditProfileDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onPhotoPathChange(uri.toString())
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit profile") },
@@ -336,13 +387,22 @@ private fun EditProfileDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = uiState.photoPath,
-                    onValueChange = onPhotoPathChange,
-                    label = { Text("Photo path") },
+                OutlinedButton(
+                    onClick = { photoPicker.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !uiState.isLoading
-                )
+                ) {
+                    Text(if (uiState.photoPath.isBlank()) "Choose photo" else "Change photo")
+                }
+
+                if (uiState.photoPath.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Photo selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 if (uiState.errorMessage != null) {
                     Spacer(modifier = Modifier.height(8.dp))

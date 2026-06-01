@@ -1,5 +1,7 @@
 package com.project.sharist.data.usecase.auth
 
+import android.content.Context
+import android.net.Uri
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.auth.RegisterUserInput
 import com.project.sharist.data.model.error.AuthException
@@ -16,7 +18,7 @@ class RegisterUserUseCase(
     private val repository: UserRepository
 ) {
 
-    suspend operator fun invoke(data: RegisterUserInput) : GenericResult<Unit> {
+    suspend operator fun invoke(context: Context, data: RegisterUserInput) : GenericResult<Unit> {
         return safeSupabaseCall {
             supabase.auth.signUpWith(Email) {
                 email = data.email
@@ -27,11 +29,17 @@ class RegisterUserUseCase(
                 ?: throw AuthException(
                     "Account was created, but Supabase did not return a logged in user"
                 )
+            val photoPath = data.photoPath.trim()
+            val savedPhotoPath = if (photoPath.startsWith("content://")) {
+                repository.uploadAvatar(context, authUser.id, Uri.parse(photoPath))
+            } else {
+                photoPath
+            }
 
             val newUser = User(
                 id = authUser.id,
                 name = data.name,
-                photoPath = data.photoPath
+                photoPath = savedPhotoPath
             )
 
             val userRoles = data.roles.mapNotNull { role ->

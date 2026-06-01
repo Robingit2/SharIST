@@ -1,5 +1,7 @@
 package com.project.sharist.data.repository
 
+import android.content.Context
+import android.net.Uri
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.user.RoleType
@@ -8,6 +10,9 @@ import com.project.sharist.data.model.user.UserRole
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.storage.storage
+import io.github.jan.supabase.storage.upload
+import io.ktor.http.ContentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -50,6 +55,29 @@ class UserRepository {
                 eq("id", userId)
             }
         }
+    }
+
+    suspend fun uploadAvatar(context: Context, userId: String, uri: Uri): String {
+        val contentType = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val path = "users/$userId/avatar.${contentType.toAvatarExtension()}"
+        supabase.storage.from("avatars").upload(path, uri) {
+            upsert = true
+            this.contentType = ContentType.parse(contentType)
+        }
+        return path
+    }
+
+    suspend fun downloadAvatar(path: String): ByteArray {
+        return supabase.storage.from("avatars").downloadAuthenticated(path)
+    }
+}
+
+private fun String.toAvatarExtension(): String {
+    return when (lowercase()) {
+        "image/png" -> "png"
+        "image/webp" -> "webp"
+        "image/gif" -> "gif"
+        else -> "jpg"
     }
 }
 

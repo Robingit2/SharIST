@@ -25,6 +25,7 @@ data class ProfileUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val user: User? = null,
+    val avatarBytes: ByteArray? = null,
     val roles: List<RoleType> = emptyList(),
     val comments: List<UserComment> = emptyList(),
     val commentAuthorNames: Map<String, String> = emptyMap(),
@@ -75,6 +76,15 @@ class ProfileViewModel(
 
             try {
                 val user = userRepository.getUser(userId).getOrThrow("Unable to load user.")
+                val avatarBytes = user.photoPath
+                    ?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
+                    ?.let { path ->
+                        try {
+                            userRepository.downloadAvatar(path)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
                 val roles = userRepository.getUserRoles(userId)
                 val ratings = ratingsRepository.getRatingsByTarget(userId).getOrThrow("Unable to load ratings.")
                 val comments = commentsRepository.getCommentsByTarget(userId).getOrThrow("Unable to load comments.")
@@ -88,6 +98,7 @@ class ProfileViewModel(
 
                 _uiState.value = ProfileUiState(
                     user = user,
+                    avatarBytes = avatarBytes,
                     roles = roles,
                     comments = comments,
                     commentAuthorNames = commentAuthorNames,
