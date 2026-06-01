@@ -1,7 +1,6 @@
 package com.project.sharist.ui.screen.available_rides
 
 import android.content.Context
-import android.location.Geocoder
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
@@ -17,15 +16,13 @@ import com.project.sharist.domain.model.RecurringType
 import com.project.sharist.domain.model.RideOffer
 import com.project.sharist.domain.model.RideRequest
 import com.project.sharist.ui.util.buildRideOfferTitles
+import com.project.sharist.ui.util.launchAddressSearch
 import io.github.jan.supabase.auth.auth
-import java.util.Locale
 import java.util.UUID
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 data class AvailableRidesUiState(
     val departureAddress: String = "",
@@ -107,14 +104,16 @@ class AvailableRidesViewModel : ViewModel() {
     }
 
     fun searchDepartureAddress(context: Context) {
-        searchAddress(
+        launchAddressSearch(
             context = context,
             query = uiState.value.departureAddress,
-            onFound = { lat, lng ->
+            onLoadingChange = { isLoading -> _uiState.update { it.copy(isLoading = isLoading) } },
+            onError = { error -> _uiState.update { it.copy(errorMessage = error) } },
+            onFound = { location ->
                 _uiState.update {
                     it.copy(
-                        departureLat = lat.toString(),
-                        departureLng = lng.toString(),
+                        departureLat = location.latitude.toString(),
+                        departureLng = location.longitude.toString(),
                         errorMessage = null
                     )
                 }
@@ -123,14 +122,16 @@ class AvailableRidesViewModel : ViewModel() {
     }
 
     fun searchArrivalAddress(context: Context) {
-        searchAddress(
+        launchAddressSearch(
             context = context,
             query = uiState.value.arrivalAddress,
-            onFound = { lat, lng ->
+            onLoadingChange = { isLoading -> _uiState.update { it.copy(isLoading = isLoading) } },
+            onError = { error -> _uiState.update { it.copy(errorMessage = error) } },
+            onFound = { location ->
                 _uiState.update {
                     it.copy(
-                        arrivalLat = lat.toString(),
-                        arrivalLng = lng.toString(),
+                        arrivalLat = location.latitude.toString(),
+                        arrivalLng = location.longitude.toString(),
                         errorMessage = null
                     )
                 }
@@ -183,48 +184,6 @@ class AvailableRidesViewModel : ViewModel() {
                 }
             }
             .toMap()
-    }
-
-    private fun searchAddress(
-        context: Context,
-        query: String,
-        onFound: (lat: Double, lng: Double) -> Unit
-    ) {
-        if (query.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Enter an address to search.") }
-            return
-        }
-
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    Geocoder(context, Locale.getDefault())
-                        .getFromLocationName(query, 1)
-                        ?.firstOrNull()
-                }
-
-                if (result == null) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = "Address not found."
-                        )
-                    }
-                } else {
-                    onFound(result.latitude, result.longitude)
-                    _uiState.update { it.copy(isLoading = false) }
-                }
-            } catch (exception: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = exception.message ?: "Could not search address."
-                    )
-                }
-            }
-        }
     }
 
     private fun AvailableRidesUiState.toRideRequestOrError(): RideRequest? {

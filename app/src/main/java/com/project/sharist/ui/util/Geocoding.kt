@@ -4,14 +4,25 @@ import android.content.Context
 import android.location.Address
 import android.location.Geocoder
 import com.project.sharist.domain.model.LatLng
-import com.project.sharist.domain.model.RideOffer
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+suspend fun findAddressCoordinates(
+    context: Context,
+    query: String
+): LatLng? {
+    return withContext(Dispatchers.IO) {
+        Geocoder(context, Locale.getDefault())
+            .getFromLocationName(query, 1)
+            ?.firstOrNull()
+            ?.let { LatLng(it.latitude, it.longitude) }
+    }
+}
+
 suspend fun buildRideOfferTitles(
     context: Context,
-    offers: List<RideOffer>
+    offers: List<com.project.sharist.domain.model.RideOffer>
 ): Map<String, String> {
     return withContext(Dispatchers.IO) {
         val geocoder = Geocoder(context, Locale.getDefault())
