@@ -12,19 +12,22 @@ data class RideRequestEntity(
     @PrimaryKey
     val id: String,
 
+    @SerialName("passenger_id")
+    val passengerId: String,
+
     @SerialName("departure_latitude")
     val departureLat: Double,
     @SerialName("departure_longitude")
     val departureLng: Double,
     @SerialName("departure_tolerance_radius_meters")
-    val departureRadiusMeters: Double,
+    val departureRadiusMeters: Int,
 
     @SerialName("arrival_latitude")
     val arrivalLat: Double,
     @SerialName("arrival_longitude")
     val arrivalLng: Double,
     @SerialName("arrival_tolerance_radius_meters")
-    val arrivalRadiusMeters: Double,
+    val arrivalRadiusMeters: Int,
 
     @SerialName("departure_time")
     val desiredDepartureTime: String,
@@ -33,5 +36,8 @@ data class RideRequestEntity(
     val departureToleranceMinutes: Int,
 
     @SerialName("recurrence_type")
-    val recurringType: String
+    val recurringType: String,
+
+    @SerialName("created_at")
+    val createdAt: String? = null
 )

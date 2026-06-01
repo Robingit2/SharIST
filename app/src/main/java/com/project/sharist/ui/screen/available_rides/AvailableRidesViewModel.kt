@@ -226,10 +226,10 @@ class AvailableRidesViewModel : ViewModel() {
     private fun AvailableRidesUiState.toRideRequestOrError(): RideRequest? {
         val departureLatValue = departureLat.toDoubleOrNull()
         val departureLngValue = departureLng.toDoubleOrNull()
-        val departureRadiusValue = departureRadiusMeters.toDoubleOrNull()
+        val departureRadiusValue = departureRadiusMeters.toIntOrNull()
         val arrivalLatValue = arrivalLat.toDoubleOrNull()
         val arrivalLngValue = arrivalLng.toDoubleOrNull()
-        val arrivalRadiusValue = arrivalRadiusMeters.toDoubleOrNull()
+        val arrivalRadiusValue = arrivalRadiusMeters.toIntOrNull()
         val departureTimeValue = desiredDepartureTimeMillis
         val toleranceValue = departureToleranceMinutes.toIntOrNull()
 
@@ -250,6 +250,7 @@ class AvailableRidesViewModel : ViewModel() {
 
         return RideRequest(
             id = UUID.randomUUID().toString(),
+            passengerId = supabase.auth.currentUserOrNull()?.id.orEmpty(),
             departure = LatLng(departureLatValue ?: return null, departureLngValue ?: return null),
             departureRadiusMeters = departureRadiusValue ?: return null,
             arrival = LatLng(arrivalLatValue ?: return null, arrivalLngValue ?: return null),

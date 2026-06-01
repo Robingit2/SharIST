@@ -11,6 +11,7 @@ import java.util.TimeZone
 
 fun RideRequest.toEntity() = RideRequestEntity(
     id = id,
+    passengerId = passengerId,
 
     departureLat = departure.latitude,
     departureLng = departure.longitude,
@@ -23,11 +24,13 @@ fun RideRequest.toEntity() = RideRequestEntity(
     desiredDepartureTime = desiredDepartureTimeMillis.toTimestampz(),
     departureToleranceMinutes = departureToleranceMinutes,
 
-    recurringType = recurringType.name
+    recurringType = recurringType.name,
+    createdAt = createdAt ?: System.currentTimeMillis().toTimestampz()
 )
 
 fun RideRequestEntity.toDomain() = RideRequest(
     id = id,
+    passengerId = passengerId,
 
     departure = LatLng(departureLat, departureLng),
     departureRadiusMeters = departureRadiusMeters,
@@ -38,7 +41,8 @@ fun RideRequestEntity.toDomain() = RideRequest(
     desiredDepartureTimeMillis = desiredDepartureTime.toMillis(),
     departureToleranceMinutes = departureToleranceMinutes,
 
-    recurringType = RecurringType.valueOf(recurringType)
+    recurringType = RecurringType.valueOf(recurringType),
+    createdAt = createdAt
 )
 
 private fun Long.toTimestampz(): String {

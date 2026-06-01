@@ -47,6 +47,7 @@ import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
 import com.project.sharist.ui.screen.ride_offer.MyRideOffersScreen
 import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
+import com.project.sharist.ui.screen.ride_request.RideRequestScreen
 import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.users.ProfileScreen
 import com.project.sharist.ui.screen.vehicles.MyVehiclesScreen
@@ -226,6 +227,9 @@ private fun AppNavHost(
                 role = activeRole,
                 onCreateRideOfferClick = {
                     navController.navigate(Screen.RideOffer.route)
+                },
+                onCreateRideRequestClick = {
+                    navController.navigate(Screen.RideRequest.route)
                 }
             )
         }
@@ -257,6 +261,14 @@ private fun AppNavHost(
         composable(Screen.RideOffer.route) {
             RideOfferScreen(
                 onRideOfferSaved = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.RideRequest.route) {
+            RideRequestScreen(
+                onRideRequestSaved = {
                     navController.popBackStack()
                 }
             )
