@@ -1,8 +1,13 @@
 package com.project.sharist.ui.screen.vehicles
 
+import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -88,6 +95,7 @@ fun MyVehiclesScreen(
                     items(uiState.vehicles) { vehicle ->
                         VehicleItem(
                             vehicle = vehicle,
+                            photoBytes = uiState.vehiclePhotoBytes[vehicle.id],
                             onDeleteClick = {
                                 viewModel.deleteVehicle(vehicle.id)
                             }
@@ -106,7 +114,7 @@ fun MyVehiclesScreen(
         AddVehicleDialog(
             onDismiss = { showAddDialog = false },
             onAddClick = { plate, photoPath ->
-                viewModel.addVehicle(plate = plate, photoPath = photoPath)
+                viewModel.addVehicle(context = context, plate = plate, photoPath = photoPath)
                 showAddDialog = false
             }
         )
@@ -116,6 +124,7 @@ fun MyVehiclesScreen(
 @Composable
 private fun VehicleItem(
     vehicle: Vehicle,
+    photoBytes: ByteArray?,
     onDeleteClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -128,6 +137,7 @@ private fun VehicleItem(
         ) {
             VehiclePhoto(
                 photoPath = vehicle.photoPath,
+                photoBytes = photoBytes,
                 modifier = Modifier.size(72.dp)
             )
 
@@ -155,8 +165,25 @@ private fun VehicleItem(
 @Composable
 private fun VehiclePhoto(
     photoPath: String?,
+    photoBytes: ByteArray?,
     modifier: Modifier = Modifier
 ) {
+    val bitmap = remember(photoBytes) {
+        photoBytes
+            ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            ?.asImageBitmap()
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = "Vehicle photo",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+        return
+    }
+
     if (photoPath.isNullOrBlank()) {
         Box(
             modifier = modifier,
@@ -185,8 +212,20 @@ private fun AddVehicleDialog(
     onDismiss: () -> Unit,
     onAddClick: (plate: String, photoPath: String?) -> Unit
 ) {
+    val context = LocalContext.current
     var plate by remember { mutableStateOf("") }
     var photoPath by remember { mutableStateOf("") }
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            photoPath = uri.toString()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -202,12 +241,21 @@ private fun AddVehicleDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = photoPath,
-                    onValueChange = { photoPath = it },
-                    label = { Text("Photo path") },
+                OutlinedButton(
+                    onClick = { photoPicker.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Text(if (photoPath.isBlank()) "Choose photo" else "Change photo")
+                }
+
+                if (photoPath.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Photo selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         },
         confirmButton = {

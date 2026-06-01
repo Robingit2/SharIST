@@ -1,5 +1,6 @@
 package com.project.sharist.ui.screen.vehicles
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.user.AddVehicleInput
@@ -18,7 +19,8 @@ import kotlinx.coroutines.launch
 data class MyVehiclesUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val vehicles: List<Vehicle> = emptyList()
+    val vehicles: List<Vehicle> = emptyList(),
+    val vehiclePhotoBytes: Map<String, ByteArray> = emptyMap()
 )
 
 class MyVehiclesViewModel(
@@ -42,8 +44,10 @@ class MyVehiclesViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
+                val vehicles = vehicleRepository.getVehiclesByUser(userId)
                 _uiState.value = MyVehiclesUiState(
-                    vehicles = vehicleRepository.getVehiclesByUser(userId)
+                    vehicles = vehicles,
+                    vehiclePhotoBytes = loadVehiclePhotos(vehicles)
                 )
             } catch (exception: Exception) {
                 _uiState.update {
@@ -56,7 +60,7 @@ class MyVehiclesViewModel(
         }
     }
 
-    fun addVehicle(plate: String, photoPath: String?) {
+    fun addVehicle(context: Context, plate: String, photoPath: String?) {
         val userId = supabase.auth.currentUserOrNull()?.id
 
         if (userId == null) {
@@ -74,6 +78,7 @@ class MyVehiclesViewModel(
 
             try {
                 addVehicleUseCase(
+                    context,
                     AddVehicleInput(
                         plate = plate.trim(),
                         photoPath = photoPath?.trim()?.takeIf { it.isNotEmpty() },
@@ -90,6 +95,18 @@ class MyVehiclesViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun loadVehiclePhotos(vehicles: List<Vehicle>): Map<String, ByteArray> {
+        return vehicles.mapNotNull { vehicle ->
+            val path = vehicle.photoPath?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
+                ?: return@mapNotNull null
+            try {
+                vehicle.id to vehicleRepository.downloadVehiclePhoto(path)
+            } catch (_: Exception) {
+                null
+            }
+        }.toMap()
     }
 
     fun deleteVehicle(vehicleId: String) {
