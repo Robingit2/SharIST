@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -218,6 +219,13 @@ private fun ProfileLoadedContent(
             averageRating = uiState.averageRating,
             ratingCount = uiState.ratingCount,
             commentsCount = uiState.comments.size
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        RatingHistogram(
+            histogram = uiState.ratingHistogram,
+            totalRatings = uiState.ratingCount
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -739,6 +747,87 @@ private fun VehicleProfilePhoto(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun RatingHistogram(
+    histogram: Map<Int, Int>,
+    totalRatings: Int
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Rating distribution",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            (5 downTo 1).forEach { rating ->
+                val count = histogram[rating] ?: 0
+                RatingHistogramRow(
+                    rating = rating,
+                    count = count,
+                    fraction = if (totalRatings == 0) 0f else count.toFloat() / totalRatings.toFloat()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingHistogramRow(
+    rating: Int,
+    count: Int,
+    fraction: Float
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.width(44.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = rating.toString(),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(10.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                    .height(10.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        Text(
+            text = count.toString(),
+            modifier = Modifier.width(28.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

@@ -35,6 +35,7 @@ data class ProfileUiState(
     val commentAuthorNames: Map<String, String> = emptyMap(),
     val averageRating: Double = 0.0,
     val ratingCount: Int = 0,
+    val ratingHistogram: Map<Int, Int> = emptyMap(),
     val isOwnProfile: Boolean = false,
     val profileUserId: String? = null,
     val currentUserId: String? = null,
@@ -113,6 +114,7 @@ class ProfileViewModel(
                     commentAuthorNames = commentAuthorNames,
                     averageRating = ratings.map { it.rating }.averageOrZero(),
                     ratingCount = ratings.size,
+                    ratingHistogram = ratings.toHistogram(),
                     isOwnProfile = userId == currentUserId,
                     profileUserId = userId,
                     currentUserId = currentUserId,
@@ -175,6 +177,7 @@ class ProfileViewModel(
                             isSavingRating = false,
                             averageRating = ratings.map { rating -> rating.rating }.averageOrZero(),
                             ratingCount = ratings.size,
+                            ratingHistogram = ratings.toHistogram(),
                             ratingMessage = "Rating saved."
                         )
                     }
@@ -270,6 +273,12 @@ class ProfileViewModel(
 
 private fun List<Int>.averageOrZero(): Double {
     return if (isEmpty()) 0.0 else average()
+}
+
+private fun List<com.project.sharist.data.model.review.UserRating>.toHistogram(): Map<Int, Int> {
+    return (1..5).associateWith { ratingValue ->
+        count { it.rating == ratingValue }
+    }
 }
 
 private fun <T> GenericResult<T>.getOrThrow(message: String): T {
