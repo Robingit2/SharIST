@@ -2,6 +2,7 @@ package com.project.sharist.data.model.review
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -10,7 +11,10 @@ import java.util.UUID
 data class UserRating (
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val rating: Int,
+    @SerialName("rater_user_id")
     val raterUserId: String,
+    @SerialName("target_user_id")
     val targetUserId: String,
+    @SerialName("created_at")
     val createdAt: String? = null
 )

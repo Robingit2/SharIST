@@ -27,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -103,7 +104,11 @@ fun ProfileScreen(
             }
         },
         onSettingsClick = onSettingsClick,
-        onLogoutClick = onLogoutClick
+        onLogoutClick = onLogoutClick,
+        onRatingChange = viewModel::updateRatingDraft,
+        onSaveRating = viewModel::submitRating,
+        onCommentChange = viewModel::updateCommentDraft,
+        onSaveComment = viewModel::submitComment
     )
 
     if (showEditDialog) {
@@ -122,7 +127,11 @@ private fun ProfileContent(
     uiState: ProfileUiState,
     onEditProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onRatingChange: (Int) -> Unit,
+    onSaveRating: () -> Unit,
+    onCommentChange: (String) -> Unit,
+    onSaveComment: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -149,7 +158,11 @@ private fun ProfileContent(
                 uiState = uiState,
                 onEditProfileClick = onEditProfileClick,
                 onSettingsClick = onSettingsClick,
-                onLogoutClick = onLogoutClick
+                onLogoutClick = onLogoutClick,
+                onRatingChange = onRatingChange,
+                onSaveRating = onSaveRating,
+                onCommentChange = onCommentChange,
+                onSaveComment = onSaveComment
             )
         }
     }
@@ -160,7 +173,11 @@ private fun ProfileLoadedContent(
     uiState: ProfileUiState,
     onEditProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onRatingChange: (Int) -> Unit,
+    onSaveRating: () -> Unit,
+    onCommentChange: (String) -> Unit,
+    onSaveComment: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -196,7 +213,27 @@ private fun ProfileLoadedContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        CommentsSection(comments = uiState.comments)
+        if (!uiState.isOwnProfile) {
+            ReviewActionsSection(
+                rating = uiState.ratingDraft,
+                comment = uiState.commentDraft,
+                isSavingRating = uiState.isSavingRating,
+                isSavingComment = uiState.isSavingComment,
+                ratingMessage = uiState.ratingMessage,
+                commentMessage = uiState.commentMessage,
+                onRatingChange = onRatingChange,
+                onSaveRating = onSaveRating,
+                onCommentChange = onCommentChange,
+                onSaveComment = onSaveComment
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        CommentsSection(
+            comments = uiState.comments,
+            authorNames = uiState.commentAuthorNames
+        )
 
         if (uiState.isOwnProfile) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -468,7 +505,10 @@ private fun DetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun CommentsSection(comments: List<UserComment>) {
+private fun CommentsSection(
+    comments: List<UserComment>,
+    authorNames: Map<String, String>
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -488,7 +528,10 @@ private fun CommentsSection(comments: List<UserComment>) {
                 )
             } else {
                 comments.forEach { comment ->
-                    CommentItem(comment = comment)
+                    CommentItem(
+                        comment = comment,
+                        authorName = authorNames[comment.raterUserId] ?: "Unknown user"
+                    )
                 }
             }
         }
@@ -496,7 +539,10 @@ private fun CommentsSection(comments: List<UserComment>) {
 }
 
 @Composable
-private fun CommentItem(comment: UserComment) {
+private fun CommentItem(
+    comment: UserComment,
+    authorName: String
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
@@ -512,12 +558,172 @@ private fun CommentItem(comment: UserComment) {
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "By ${comment.raterUserId}" + (comment.createdAt?.let { " · $it" } ?: ""),
+                text = "By $authorName" + (comment.createdAt?.toShortDate()?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+@Composable
+private fun ReviewActionsSection(
+    rating: Int,
+    comment: String,
+    isSavingRating: Boolean,
+    isSavingComment: Boolean,
+    ratingMessage: String?,
+    commentMessage: String?,
+    onRatingChange: (Int) -> Unit,
+    onSaveRating: () -> Unit,
+    onCommentChange: (String) -> Unit,
+    onSaveComment: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        RatingInputCard(
+            rating = rating,
+            isSaving = isSavingRating,
+            message = ratingMessage,
+            onRatingChange = onRatingChange,
+            onSave = onSaveRating
+        )
+
+        CommentInputCard(
+            comment = comment,
+            isSaving = isSavingComment,
+            message = commentMessage,
+            onCommentChange = onCommentChange,
+            onSave = onSaveComment
+        )
+    }
+}
+
+@Composable
+private fun RatingInputCard(
+    rating: Int,
+    isSaving: Boolean,
+    message: String?,
+    onRatingChange: (Int) -> Unit,
+    onSave: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Add rating",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                (1..5).forEach { value ->
+                    IconButton(
+                        onClick = { onRatingChange(value) },
+                        enabled = !isSaving
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "$value star rating",
+                            modifier = Modifier.size(32.dp),
+                            tint = if (value <= rating) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Button(
+                    onClick = onSave,
+                    enabled = !isSaving
+                ) {
+                    Text(if (isSaving) "Saving..." else "Save rating")
+                }
+            }
+
+            ReviewMessage(message = message)
+        }
+    }
+}
+
+@Composable
+private fun CommentInputCard(
+    comment: String,
+    isSaving: Boolean,
+    message: String?,
+    onCommentChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Add comment",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            OutlinedTextField(
+                value = comment,
+                onValueChange = onCommentChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Comment") },
+                minLines = 3,
+                enabled = !isSaving
+            )
+
+            Button(
+                onClick = onSave,
+                enabled = !isSaving && comment.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isSaving) "Saving..." else "Save comment")
+            }
+
+            ReviewMessage(message = message)
+        }
+    }
+}
+
+@Composable
+private fun ReviewMessage(message: String?) {
+    if (message != null) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun String.toShortDate(): String? {
+    val date = substringBefore("T")
+    val parts = date.split("-")
+    if (parts.size != 3) return null
+
+    val year = parts[0]
+    val month = parts[1].toIntOrNull()?.toString() ?: return null
+    val day = parts[2].toIntOrNull()?.toString() ?: return null
+
+    return "$day/$month/$year"
 }
 
 @Composable
