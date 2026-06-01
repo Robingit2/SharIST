@@ -131,7 +131,7 @@ fun AvailableRidesScreen(
         }
 
         Button(
-            onClick = viewModel::searchAvailableRides,
+            onClick = { viewModel.searchAvailableRides(context) },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading
         ) {
@@ -154,6 +154,7 @@ fun AvailableRidesScreen(
                 items(state.results, key = { it.id }) { offer ->
                     RideOfferResultItem(
                         offer = offer,
+                        title = state.rideTitles[offer.id],
                         driverName = state.driverNames[offer.driverId],
                         onDriverClick = onDriverClick,
                         isBooking = state.isBooking,
@@ -264,6 +265,7 @@ private fun DateTimePickerRow(
 @Composable
 private fun RideOfferResultItem(
     offer: RideOffer,
+    title: String?,
     driverName: String?,
     onDriverClick: (String) -> Unit,
     isBooking: Boolean,
@@ -275,7 +277,7 @@ private fun RideOfferResultItem(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
+                text = title ?: "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
                 style = MaterialTheme.typography.titleMedium
             )
             Text("Departure: ${offer.departureTimeMillis.formatDateTime()}")

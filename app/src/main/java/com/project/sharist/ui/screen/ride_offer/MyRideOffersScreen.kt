@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.data.repository.RideOfferRepository
@@ -33,10 +34,11 @@ import java.util.Locale
 fun MyRideOffersScreen(
     viewModel: MyRideOffersViewModel = myRideOffersViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.loadOffers()
+        viewModel.loadOffers(context)
     }
 
     Column(
@@ -59,6 +61,7 @@ fun MyRideOffersScreen(
                 items(uiState.offers, key = { it.id }) { offer ->
                     RideOfferItem(
                         offer = offer,
+                        title = uiState.rideTitles[offer.id],
                         onDeleteClick = { viewModel.deleteOffer(offer) }
                     )
                 }
@@ -70,6 +73,7 @@ fun MyRideOffersScreen(
 @Composable
 private fun RideOfferItem(
     offer: RideOffer,
+    title: String?,
     onDeleteClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -78,7 +82,7 @@ private fun RideOfferItem(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
+                text = title ?: "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
                 style = MaterialTheme.typography.titleMedium
             )
 

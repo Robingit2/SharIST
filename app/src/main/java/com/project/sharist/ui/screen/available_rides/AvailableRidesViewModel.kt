@@ -16,6 +16,7 @@ import com.project.sharist.domain.model.LatLng
 import com.project.sharist.domain.model.RecurringType
 import com.project.sharist.domain.model.RideOffer
 import com.project.sharist.domain.model.RideRequest
+import com.project.sharist.ui.util.buildRideOfferTitles
 import io.github.jan.supabase.auth.auth
 import java.util.Locale
 import java.util.UUID
@@ -43,7 +44,8 @@ data class AvailableRidesUiState(
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val results: List<RideOffer> = emptyList(),
-    val driverNames: Map<String, String> = emptyMap()
+    val driverNames: Map<String, String> = emptyMap(),
+    val rideTitles: Map<String, String> = emptyMap()
 )
 
 class AvailableRidesViewModel : ViewModel() {
@@ -136,7 +138,7 @@ class AvailableRidesViewModel : ViewModel() {
         )
     }
 
-    fun searchAvailableRides() {
+    fun searchAvailableRides(context: Context) {
         val filter = uiState.value.toRideRequestOrError() ?: return
 
         viewModelScope.launch {
@@ -145,11 +147,13 @@ class AvailableRidesViewModel : ViewModel() {
             try {
                 val offers = loadAvailableRides(filter)
                 val driverNames = loadDriverNames(offers)
+                val rideTitles = buildRideOfferTitles(context, offers)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         results = offers,
-                        driverNames = driverNames
+                        driverNames = driverNames,
+                        rideTitles = rideTitles
                     )
                 }
             } catch (exception: Exception) {
