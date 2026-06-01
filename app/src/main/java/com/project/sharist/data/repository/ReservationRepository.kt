@@ -15,4 +15,16 @@ class ReservationRepository {
             reservationsTable.insert(reservation)
         }
     }
+
+    suspend fun getReservationsByPassenger(passengerId: String): List<ReservationEntity> {
+        return reservationsTable.select {
+            filter {
+                eq("passenger_id", passengerId)
+            }
+        }.decodeList()
+    }
+
+    suspend fun getReservations(): List<ReservationEntity> {
+        return reservationsTable.select().decodeList()
+    }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.repository.ReservationRepository
 import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.domain.model.RideOffer
 import com.project.sharist.ui.util.buildRideOfferTitles
@@ -17,11 +18,13 @@ data class MyRideOffersUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val offers: List<RideOffer> = emptyList(),
-    val rideTitles: Map<String, String> = emptyMap()
+    val rideTitles: Map<String, String> = emptyMap(),
+    val reservationCounts: Map<String, Int> = emptyMap()
 )
 
 class MyRideOffersViewModel(
-    private val repository: RideOfferRepository
+    private val repository: RideOfferRepository,
+    private val reservationRepository: ReservationRepository = ReservationRepository()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyRideOffersUiState())
@@ -35,7 +38,8 @@ class MyRideOffersViewModel(
                 val offers = repository.getOffers().map { it.toDomain() }
                 _uiState.value = MyRideOffersUiState(
                     offers = offers,
-                    rideTitles = buildRideOfferTitles(context, offers)
+                    rideTitles = buildRideOfferTitles(context, offers),
+                    reservationCounts = loadReservationCounts()
                 )
             } catch (exception: Exception) {
                 _uiState.update {
@@ -58,7 +62,8 @@ class MyRideOffersViewModel(
                     it.copy(
                         isLoading = false,
                         offers = it.offers.filterNot { existingOffer -> existingOffer.id == offer.id },
-                        rideTitles = it.rideTitles - offer.id
+                        rideTitles = it.rideTitles - offer.id,
+                        reservationCounts = it.reservationCounts - offer.id
                     )
                 }
             } catch (exception: Exception) {
@@ -70,5 +75,11 @@ class MyRideOffersViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun loadReservationCounts(): Map<String, Int> {
+        return reservationRepository.getReservations()
+            .groupingBy { it.rideOfferId }
+            .eachCount()
     }
 }

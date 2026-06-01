@@ -42,7 +42,8 @@ data class AvailableRidesUiState(
     val successMessage: String? = null,
     val results: List<RideOffer> = emptyList(),
     val driverNames: Map<String, String> = emptyMap(),
-    val rideTitles: Map<String, String> = emptyMap()
+    val rideTitles: Map<String, String> = emptyMap(),
+    val reservationCounts: Map<String, Int> = emptyMap()
 )
 
 class AvailableRidesViewModel : ViewModel() {
@@ -81,23 +82,47 @@ class AvailableRidesViewModel : ViewModel() {
                 )
             }
 
-            when (val result = reservationRepository.insert(ReservationEntity(offerId, passengerId))) {
-                is GenericResult.Success -> {
+            try {
+                val offer = uiState.value.results.firstOrNull { it.id == offerId }
+                val currentReservationCount = reservationRepository.getReservations()
+                    .count { it.rideOfferId == offerId }
+
+                if (offer == null || currentReservationCount >= offer.vehicleCapacity) {
                     _uiState.update {
                         it.copy(
                             isBooking = false,
-                            successMessage = "Ride booked."
+                            errorMessage = "No free spots available."
                         )
                     }
+                    return@launch
                 }
 
-                is GenericResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isBooking = false,
-                            errorMessage = result.error.toMessage()
-                        )
+                when (val result = reservationRepository.insert(ReservationEntity(offerId, passengerId))) {
+                    is GenericResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                isBooking = false,
+                                successMessage = "Ride booked.",
+                                reservationCounts = it.reservationCounts + (offerId to currentReservationCount + 1)
+                            )
+                        }
                     }
+
+                    is GenericResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isBooking = false,
+                                errorMessage = result.error.toMessage()
+                            )
+                        }
+                    }
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isBooking = false,
+                        errorMessage = exception.message ?: "Could not check available spots."
+                    )
                 }
             }
         }
@@ -149,12 +174,14 @@ class AvailableRidesViewModel : ViewModel() {
                 val offers = loadAvailableRides(filter)
                 val driverNames = loadDriverNames(offers)
                 val rideTitles = buildRideOfferTitles(context, offers)
+                val reservationCounts = loadReservationCounts()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         results = offers,
                         driverNames = driverNames,
-                        rideTitles = rideTitles
+                        rideTitles = rideTitles,
+                        reservationCounts = reservationCounts
                     )
                 }
             } catch (exception: Exception) {
@@ -184,6 +211,12 @@ class AvailableRidesViewModel : ViewModel() {
                 }
             }
             .toMap()
+    }
+
+    private suspend fun loadReservationCounts(): Map<String, Int> {
+        return reservationRepository.getReservations()
+            .groupingBy { it.rideOfferId }
+            .eachCount()
     }
 
     private fun AvailableRidesUiState.toRideRequestOrError(): RideRequest? {

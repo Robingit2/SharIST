@@ -1,70 +1,78 @@
-package com.project.sharist.ui.screen.ride_offer
+package com.project.sharist.ui.screen.reservations
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.domain.model.RideOffer
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @Composable
-fun MyRideOffersScreen(
-    viewModel: MyRideOffersViewModel = myRideOffersViewModel()
+fun ReservationsScreen(
+    onDriverClick: (String) -> Unit,
+    viewModel: ReservationsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.loadOffers(context)
+        viewModel.loadReservations(context)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("My ride offers", style = MaterialTheme.typography.headlineLarge)
+        Text("Reservations", style = MaterialTheme.typography.headlineLarge)
 
-        Spacer(modifier = Modifier.height(16.dp))
+        when {
+            state.isLoading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
 
-        if (uiState.isLoading) {
-            CircularProgressIndicator()
-        } else if (uiState.errorMessage != null) {
-            Text(uiState.errorMessage.orEmpty())
-        } else if (uiState.offers.isEmpty()) {
-            Text("No ride offers created.")
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(uiState.offers, key = { it.id }) { offer ->
-                    RideOfferItem(
-                        offer = offer,
-                        title = uiState.rideTitles[offer.id],
-                        freeSpots = (offer.vehicleCapacity - (uiState.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
-                        onDeleteClick = { viewModel.deleteOffer(offer) }
-                    )
+            state.errorMessage != null -> {
+                Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+                Button(onClick = { viewModel.loadReservations(context) }) {
+                    Text("Retry")
+                }
+            }
+
+            state.reservations.isEmpty() -> {
+                Text("No reservations yet.")
+            }
+
+            else -> {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.reservations, key = { it.id }) { offer ->
+                        ReservationItem(
+                            offer = offer,
+                            title = state.rideTitles[offer.id],
+                            driverName = state.driverNames[offer.driverId],
+                            freeSpots = (offer.vehicleCapacity - (state.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
+                            onDriverClick = { onDriverClick(offer.driverId) }
+                        )
+                    }
                 }
             }
         }
@@ -72,11 +80,12 @@ fun MyRideOffersScreen(
 }
 
 @Composable
-private fun RideOfferItem(
+private fun ReservationItem(
     offer: RideOffer,
     title: String?,
+    driverName: String?,
     freeSpots: Int,
-    onDeleteClick: () -> Unit
+    onDriverClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -87,35 +96,17 @@ private fun RideOfferItem(
                 text = title ?: "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
                 style = MaterialTheme.typography.titleMedium
             )
-
             Text("Departure: ${offer.departureTimeMillis.formatDateTime()}")
             Text("Arrival: ${offer.estimatedArrivalTimeMillis.formatDateTime()}")
             Text("Cost: ${offer.cost}")
             Text("Free spots: $freeSpots")
-            Text("Cancellation: ${offer.cancellationWindowMinutes} minutes")
             Text("Recurring: ${offer.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                OutlinedButton(onClick = onDeleteClick) {
-                    Text("Delete")
-                }
+            TextButton(onClick = onDriverClick) {
+                Text("Driver: ${driverName ?: offer.driverId}")
             }
         }
     }
-}
-
-@Composable
-private fun myRideOffersViewModel(): MyRideOffersViewModel {
-    val repository = remember {
-        RideOfferRepository()
-    }
-
-    return viewModel(
-        factory = MyRideOffersViewModelFactory(repository)
-    )
 }
 
 private fun Long.formatDateTime(): String {

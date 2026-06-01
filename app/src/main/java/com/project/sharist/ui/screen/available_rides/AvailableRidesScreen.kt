@@ -155,6 +155,7 @@ fun AvailableRidesScreen(
                     RideOfferResultItem(
                         offer = offer,
                         title = state.rideTitles[offer.id],
+                        freeSpots = (offer.vehicleCapacity - (state.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
                         driverName = state.driverNames[offer.driverId],
                         onDriverClick = onDriverClick,
                         isBooking = state.isBooking,
@@ -266,6 +267,7 @@ private fun DateTimePickerRow(
 private fun RideOfferResultItem(
     offer: RideOffer,
     title: String?,
+    freeSpots: Int,
     driverName: String?,
     onDriverClick: (String) -> Unit,
     isBooking: Boolean,
@@ -283,7 +285,7 @@ private fun RideOfferResultItem(
             Text("Departure: ${offer.departureTimeMillis.formatDateTime()}")
             Text("Arrival: ${offer.estimatedArrivalTimeMillis.formatDateTime()}")
             Text("Cost: ${offer.cost}")
-            Text("Capacity: ${offer.vehicleCapacity}")
+            Text("Free spots: $freeSpots")
             Text("Recurring: ${offer.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
 
             TextButton(onClick = { onDriverClick(offer.driverId) }) {
@@ -293,9 +295,9 @@ private fun RideOfferResultItem(
             Button(
                 onClick = onBookClick,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isBooking
+                enabled = !isBooking && freeSpots > 0
             ) {
-                Text("Book ride")
+                Text(if (freeSpots > 0) "Book ride" else "Fully booked")
             }
         }
     }

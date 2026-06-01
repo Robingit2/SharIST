@@ -45,6 +45,7 @@ import com.project.sharist.ui.navigation.Navigation.Screen
 import com.project.sharist.ui.screen.available_rides.AvailableRidesScreen
 import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
+import com.project.sharist.ui.screen.reservations.ReservationsScreen
 import com.project.sharist.ui.screen.ride_offer.MyRideOffersScreen
 import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
 import com.project.sharist.ui.screen.ride_request.RideRequestScreen
@@ -162,7 +163,10 @@ fun AppNav() {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.MyRideOffers.route)
                     },
-                    onReservationsClick = { scope.launch { drawerState.close() } },
+                    onReservationsClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.Reservations.route)
+                    },
                     onAvailableRidesClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.AvailableRides.route)
@@ -280,6 +284,14 @@ private fun AppNavHost(
 
         composable(Screen.AvailableRides.route) {
             AvailableRidesScreen(
+                onDriverClick = { driverId ->
+                    navController.navigate("${Screen.Profile.route}/$driverId")
+                }
+            )
+        }
+
+        composable(Screen.Reservations.route) {
+            ReservationsScreen(
                 onDriverClick = { driverId ->
                     navController.navigate("${Screen.Profile.route}/$driverId")
                 }
