@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.data.model.review.UserComment
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.model.user.User
+import com.project.sharist.data.model.user.Vehicle
 import com.project.sharist.viewmodel.ProfileUiState
 import com.project.sharist.viewmodel.ProfileViewModel
 import java.util.Locale
@@ -227,6 +228,15 @@ private fun ProfileLoadedContent(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        if (RoleType.DRIVER in uiState.roles) {
+            VehiclesSection(
+                vehicles = uiState.vehicles,
+                vehiclePhotoBytes = uiState.vehiclePhotoBytes
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         if (!uiState.isOwnProfile) {
             ReviewActionsSection(
@@ -619,6 +629,112 @@ private fun CommentItem(
             )
             Text(
                 text = "By $authorName" + (comment.createdAt?.toShortDate()?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun VehiclesSection(
+    vehicles: List<Vehicle>,
+    vehiclePhotoBytes: Map<String, ByteArray>
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Vehicles",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (vehicles.isEmpty()) {
+                Text(
+                    text = "No vehicles added.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                vehicles.forEach { vehicle ->
+                    VehicleProfileItem(
+                        vehicle = vehicle,
+                        photoBytes = vehiclePhotoBytes[vehicle.id]
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleProfileItem(
+    vehicle: Vehicle,
+    photoBytes: ByteArray?
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            VehicleProfilePhoto(
+                photoBytes = photoBytes,
+                modifier = Modifier.size(64.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = vehicle.plate,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = "Vehicle",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleProfilePhoto(
+    photoBytes: ByteArray?,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(photoBytes) {
+        photoBytes
+            ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            ?.asImageBitmap()
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = "Vehicle photo",
+            modifier = modifier.clip(MaterialTheme.shapes.small),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No photo",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

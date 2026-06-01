@@ -8,9 +8,11 @@ import com.project.sharist.data.model.review.UserCommentInput
 import com.project.sharist.data.model.review.UserRatingInput
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.model.user.User
+import com.project.sharist.data.model.user.Vehicle
 import com.project.sharist.data.repository.UserCommentRepository
 import com.project.sharist.data.repository.UserRatingRepository
 import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.data.repository.VehicleRepository
 import com.project.sharist.data.usecase.review.GiveOrUpdateCommentUseCase
 import com.project.sharist.data.usecase.review.GiveOrUpdateRatingUseCase
 import com.project.sharist.supabase
@@ -27,6 +29,8 @@ data class ProfileUiState(
     val user: User? = null,
     val avatarBytes: ByteArray? = null,
     val roles: List<RoleType> = emptyList(),
+    val vehicles: List<Vehicle> = emptyList(),
+    val vehiclePhotoBytes: Map<String, ByteArray> = emptyMap(),
     val comments: List<UserComment> = emptyList(),
     val commentAuthorNames: Map<String, String> = emptyMap(),
     val averageRating: Double = 0.0,
@@ -46,6 +50,7 @@ class ProfileViewModel(
     private val userRepository: UserRepository = UserRepository(),
     private val ratingsRepository: UserRatingRepository = UserRatingRepository(),
     private val commentsRepository: UserCommentRepository = UserCommentRepository(),
+    private val vehicleRepository: VehicleRepository = VehicleRepository(),
     private val giveOrUpdateRatingUseCase: GiveOrUpdateRatingUseCase = GiveOrUpdateRatingUseCase(ratingsRepository),
     private val giveOrUpdateCommentUseCase: GiveOrUpdateCommentUseCase = GiveOrUpdateCommentUseCase(commentsRepository)
 ) : ViewModel() {
@@ -86,6 +91,8 @@ class ProfileViewModel(
                         }
                     }
                 val roles = userRepository.getUserRoles(userId)
+                val vehicles = vehicleRepository.getVehiclesByUser(userId)
+                val vehiclePhotoBytes = loadVehiclePhotos(vehicles)
                 val ratings = ratingsRepository.getRatingsByTarget(userId).getOrThrow("Unable to load ratings.")
                 val comments = commentsRepository.getCommentsByTarget(userId).getOrThrow("Unable to load comments.")
                 val commentAuthorNames = loadCommentAuthorNames(comments)
@@ -100,6 +107,8 @@ class ProfileViewModel(
                     user = user,
                     avatarBytes = avatarBytes,
                     roles = roles,
+                    vehicles = vehicles,
+                    vehiclePhotoBytes = vehiclePhotoBytes,
                     comments = comments,
                     commentAuthorNames = commentAuthorNames,
                     averageRating = ratings.map { it.rating }.averageOrZero(),
@@ -233,6 +242,18 @@ class ProfileViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun loadVehiclePhotos(vehicles: List<Vehicle>): Map<String, ByteArray> {
+        return vehicles.mapNotNull { vehicle ->
+            val path = vehicle.photoPath?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
+                ?: return@mapNotNull null
+            try {
+                vehicle.id to vehicleRepository.downloadVehiclePhoto(path)
+            } catch (_: Exception) {
+                null
+            }
+        }.toMap()
     }
 
     private suspend fun loadCommentAuthorNames(comments: List<UserComment>): Map<String, String> {
