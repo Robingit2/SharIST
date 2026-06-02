@@ -48,7 +48,8 @@ class MyRideOffersViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
-                val offers = repository.getOffersByDriver(driverId).map { it.toDomain() }
+                val offers = repository.getFutureOffersByDriver(driverId, System.currentTimeMillis().toTimestampz())
+                    .map { it.toDomain() }
                 val offerIds = offers.map { it.id }.toSet()
                 val passengerIdsByOffer = loadPassengerIdsByOffer(offerIds)
                 _uiState.value = MyRideOffersUiState(
@@ -119,4 +120,11 @@ private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? 
         is com.project.sharist.data.model.GenericResult.Success -> data
         is com.project.sharist.data.model.GenericResult.Error -> null
     }
+}
+
+private fun Long.toTimestampz(): String {
+    return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(this))
+        .replace("+0000", "+00:00")
 }

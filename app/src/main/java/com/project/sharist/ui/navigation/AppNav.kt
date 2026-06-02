@@ -43,6 +43,7 @@ import com.project.sharist.data.usecase.auth.LogoutUserUseCase
 import com.project.sharist.supabase
 import com.project.sharist.ui.navigation.Navigation.Screen
 import com.project.sharist.ui.screen.available_rides.AvailableRidesScreen
+import com.project.sharist.ui.screen.history.HistoryScreen
 import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
 import com.project.sharist.ui.screen.reservations.ReservationsScreen
@@ -155,7 +156,10 @@ fun AppNav() {
                         navController.navigate(Screen.Profile.route)
                     },
                     onSettingsClick = { scope.launch { drawerState.close() } },
-                    onHistoryClick = { scope.launch { drawerState.close() } },
+                    onHistoryClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.History.route)
+                    },
                     onMyVehiclesClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.MyVehicles.route)
@@ -265,6 +269,15 @@ private fun AppNavHost(
 
         composable(Screen.MyVehicles.route) {
             MyVehiclesScreen()
+        }
+
+        composable(Screen.History.route) {
+            HistoryScreen(
+                role = activeRole,
+                onUserClick = { userId ->
+                    navController.navigate("${Screen.Profile.route}/$userId")
+                }
+            )
         }
 
         composable(Screen.RideOffer.route) {

@@ -63,7 +63,7 @@ class MyRideRequestsViewModel(
 
             try {
                 val requests = repository
-                    .getRequestsByPassenger(passengerId)
+                    .getFutureRequestsByPassenger(passengerId, System.currentTimeMillis().toTimestampz())
                     .map { it.toDomain() }
 
                 _uiState.value = MyRideRequestsUiState(
@@ -114,7 +114,7 @@ class MyRideRequestsViewModel(
                     .map { it.rideOfferId }
                     .toSet()
                 val offers = rideOfferRepository
-                    .getOffers()
+                    .getFutureOffers(System.currentTimeMillis().toTimestampz())
                     .map { it.toDomain() }
                     .filter { it.id in offerIds }
                 val offerTitles = buildRideOfferTitles(context, offers)
@@ -241,4 +241,11 @@ private fun AppError.toMessage(): String {
         AppError.NotFound -> "Reservation table or ride offer was not found."
         is AppError.Unknown -> message ?: "Could not book ride."
     }
+}
+
+private fun Long.toTimestampz(): String {
+    return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(this))
+        .replace("+0000", "+00:00")
 }

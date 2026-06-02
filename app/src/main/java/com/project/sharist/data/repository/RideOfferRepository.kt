@@ -20,10 +20,36 @@ class RideOfferRepository {
         return rideOffersTable.select().decodeList()
     }
 
+    suspend fun getFutureOffers(after: String): List<RideOfferEntity> {
+        return rideOffersTable.select {
+            filter {
+                gte("departure_time", after)
+            }
+        }.decodeList()
+    }
+
     suspend fun getOffersByDriver(driverId: String): List<RideOfferEntity> {
         return rideOffersTable.select {
             filter {
                 eq("driver_id", driverId)
+            }
+        }.decodeList()
+    }
+
+    suspend fun getFutureOffersByDriver(driverId: String, after: String): List<RideOfferEntity> {
+        return rideOffersTable.select {
+            filter {
+                eq("driver_id", driverId)
+                gte("departure_time", after)
+            }
+        }.decodeList()
+    }
+
+    suspend fun getPastOffersByDriver(driverId: String, before: String): List<RideOfferEntity> {
+        return rideOffersTable.select {
+            filter {
+                eq("driver_id", driverId)
+                lt("departure_time", before)
             }
         }.decodeList()
     }
@@ -42,6 +68,7 @@ class RideOfferRepository {
                 filter {
                     neq("driver_id", request.passengerId)
                     eq("recurrence_type", request.recurringType)
+                    gte("departure_time", System.currentTimeMillis().toTimestampz())
                     gte("departure_time", departureStart)
                     lte("departure_time", departureEnd)
                     gte("departure_latitude", request.departureLat - departureBounds.latitudeDelta)

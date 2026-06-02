@@ -52,7 +52,7 @@ class ReservationsViewModel(
                     .map { it.rideOfferId }
                     .toSet()
                 val offers = rideOfferRepository
-                    .getOffers()
+                    .getFutureOffers(System.currentTimeMillis().toTimestampz())
                     .map { it.toDomain() }
                     .filter { it.id in reservedOfferIds }
 
@@ -95,4 +95,11 @@ private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? 
         is com.project.sharist.data.model.GenericResult.Success -> data
         is com.project.sharist.data.model.GenericResult.Error -> null
     }
+}
+
+private fun Long.toTimestampz(): String {
+    return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(this))
+        .replace("+0000", "+00:00")
 }
