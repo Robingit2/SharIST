@@ -32,6 +32,7 @@ import java.util.Locale
 
 @Composable
 fun MyRideOffersScreen(
+    onPassengerClick: (String) -> Unit,
     viewModel: MyRideOffersViewModel = myRideOffersViewModel()
 ) {
     val context = LocalContext.current
@@ -63,6 +64,9 @@ fun MyRideOffersScreen(
                         offer = offer,
                         title = uiState.rideTitles[offer.id],
                         freeSpots = (offer.vehicleCapacity - (uiState.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
+                        passengerIds = uiState.passengerIdsByOffer[offer.id].orEmpty(),
+                        passengerNames = uiState.passengerNames,
+                        onPassengerClick = onPassengerClick,
                         onDeleteClick = { viewModel.deleteOffer(offer) }
                     )
                 }
@@ -76,6 +80,9 @@ private fun RideOfferItem(
     offer: RideOffer,
     title: String?,
     freeSpots: Int,
+    passengerIds: List<String>,
+    passengerNames: Map<String, String>,
+    onPassengerClick: (String) -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -94,6 +101,17 @@ private fun RideOfferItem(
             Text("Free spots: $freeSpots")
             Text("Cancellation: ${offer.cancellationWindowMinutes} minutes")
             Text("Recurring: ${offer.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
+
+            Text("Passengers", style = MaterialTheme.typography.titleSmall)
+            if (passengerIds.isEmpty()) {
+                Text("No passengers yet.")
+            } else {
+                passengerIds.forEach { passengerId ->
+                    OutlinedButton(onClick = { onPassengerClick(passengerId) }) {
+                        Text(passengerNames[passengerId] ?: passengerId)
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

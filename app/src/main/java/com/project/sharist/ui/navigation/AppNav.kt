@@ -284,7 +284,11 @@ private fun AppNavHost(
         }
 
         composable(Screen.MyRideOffers.route) {
-            MyRideOffersScreen()
+            MyRideOffersScreen(
+                onPassengerClick = { passengerId ->
+                    navController.navigate("${Screen.Profile.route}/$passengerId")
+                }
+            )
         }
 
         composable(Screen.MyRideRequests.route) {

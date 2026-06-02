@@ -20,6 +20,14 @@ class RideOfferRepository {
         return rideOffersTable.select().decodeList()
     }
 
+    suspend fun getOffersByDriver(driverId: String): List<RideOfferEntity> {
+        return rideOffersTable.select {
+            filter {
+                eq("driver_id", driverId)
+            }
+        }.decodeList()
+    }
+
     suspend fun getOffers(filter: RideRequest): List<RideOfferEntity> {
         val request = filter.toEntity()
         val departureBounds = coordinateBounds(request.departureLat, request.departureRadiusMeters)
