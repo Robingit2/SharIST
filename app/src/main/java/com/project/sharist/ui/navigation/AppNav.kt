@@ -48,6 +48,7 @@ import com.project.sharist.ui.screen.login.LoginScreen
 import com.project.sharist.ui.screen.reservations.ReservationsScreen
 import com.project.sharist.ui.screen.ride_offer.MyRideOffersScreen
 import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
+import com.project.sharist.ui.screen.ride_request.MyRideRequestsScreen
 import com.project.sharist.ui.screen.ride_request.RideRequestScreen
 import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.users.ProfileScreen
@@ -167,6 +168,10 @@ fun AppNav() {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.Reservations.route)
                     },
+                    onMyRequestsClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.MyRideRequests.route)
+                    },
                     onAvailableRidesClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.AvailableRides.route)
@@ -282,6 +287,14 @@ private fun AppNavHost(
             MyRideOffersScreen()
         }
 
+        composable(Screen.MyRideRequests.route) {
+            MyRideRequestsScreen(
+                onDriverClick = { driverId ->
+                    navController.navigate("${Screen.Profile.route}/$driverId")
+                }
+            )
+        }
+
         composable(Screen.AvailableRides.route) {
             AvailableRidesScreen(
                 onDriverClick = { driverId ->
@@ -318,6 +331,7 @@ private fun AppDrawerContent(
     onMyVehiclesClick: () -> Unit,
     onMyOffersClick: () -> Unit,
     onReservationsClick: () -> Unit,
+    onMyRequestsClick: () -> Unit,
     onAvailableRidesClick: () -> Unit,
     onSwitchRoleClick: (RoleType) -> Unit,
     onLogoutClick: () -> Unit
@@ -352,6 +366,7 @@ private fun AppDrawerContent(
 
             RoleType.PASSENGER -> {
                 DrawerItem("Reservations", onReservationsClick)
+                DrawerItem("My ride requests", onMyRequestsClick)
                 DrawerItem("Available Rides", onAvailableRidesClick)
 
                 if (RoleType.DRIVER in userRoles) {

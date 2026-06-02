@@ -34,6 +34,20 @@ suspend fun buildRideOfferTitles(
     }
 }
 
+suspend fun buildRideRequestTitles(
+    context: Context,
+    requests: List<com.project.sharist.domain.model.RideRequest>
+): Map<String, String> {
+    return withContext(Dispatchers.IO) {
+        val geocoder = Geocoder(context, Locale.getDefault())
+        requests.associate { request ->
+            val departure = geocoder.addressFor(request.departure) ?: request.departure.formatCoordinates()
+            val arrival = geocoder.addressFor(request.arrival) ?: request.arrival.formatCoordinates()
+            request.id to "$departure -> $arrival"
+        }
+    }
+}
+
 private fun Geocoder.addressFor(location: LatLng): String? {
     return try {
         getFromLocation(location.latitude, location.longitude, 1)

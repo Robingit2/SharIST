@@ -16,6 +16,14 @@ class RideRequestRepository {
         return rideRequestsTable.select().decodeList()
     }
 
+    suspend fun getRequestsByPassenger(passengerId: String): List<RideRequestEntity> {
+        return rideRequestsTable.select {
+            filter {
+                eq("passenger_id", passengerId)
+            }
+        }.decodeList()
+    }
+
     suspend fun delete(requestId: String) {
         rideRequestsTable.delete {
             filter {

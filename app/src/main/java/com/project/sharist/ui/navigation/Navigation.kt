@@ -11,6 +11,7 @@ class Navigation {
         object RideOffer : Screen("ride_offer")
         object MyRideOffers : Screen("my_ride_offers")
         object RideRequest : Screen("ride_request")
+        object MyRideRequests : Screen("my_ride_requests")
         object AvailableRides : Screen("available_rides")
         object Reservations : Screen("reservations")
     }

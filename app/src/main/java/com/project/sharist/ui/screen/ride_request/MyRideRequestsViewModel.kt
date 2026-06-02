@@ -1,0 +1,244 @@
+package com.project.sharist.ui.screen.ride_request
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.model.error.AppError
+import com.project.sharist.data.model.ride.ReservationEntity
+import com.project.sharist.data.repository.ReservationRepository
+import com.project.sharist.data.repository.RideMatchRepository
+import com.project.sharist.data.repository.RideOfferRepository
+import com.project.sharist.data.repository.RideRequestRepository
+import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.domain.model.RideOffer
+import com.project.sharist.domain.model.RideRequest
+import com.project.sharist.supabase
+import com.project.sharist.ui.util.buildRideOfferTitles
+import com.project.sharist.ui.util.buildRideRequestTitles
+import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class MyRideRequestsUiState(
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val requests: List<RideRequest> = emptyList(),
+    val rideTitles: Map<String, String> = emptyMap(),
+    val expandedRequestId: String? = null,
+    val loadingMatchesRequestId: String? = null,
+    val bookingOfferId: String? = null,
+    val matchErrorMessage: String? = null,
+    val matchedOffers: Map<String, List<RideOffer>> = emptyMap(),
+    val matchedOfferTitles: Map<String, String> = emptyMap(),
+    val driverNames: Map<String, String> = emptyMap(),
+    val reservationCounts: Map<String, Int> = emptyMap()
+)
+
+class MyRideRequestsViewModel(
+    private val repository: RideRequestRepository = RideRequestRepository(),
+    private val rideMatchRepository: RideMatchRepository = RideMatchRepository(),
+    private val rideOfferRepository: RideOfferRepository = RideOfferRepository(),
+    private val reservationRepository: ReservationRepository = ReservationRepository(),
+    private val userRepository: UserRepository = UserRepository()
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(MyRideRequestsUiState())
+    val uiState: StateFlow<MyRideRequestsUiState> = _uiState.asStateFlow()
+
+    fun loadRequests(context: Context) {
+        val passengerId = supabase.auth.currentUserOrNull()?.id
+
+        if (passengerId == null) {
+            _uiState.value = MyRideRequestsUiState(errorMessage = "No logged in user found.")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            try {
+                val requests = repository
+                    .getRequestsByPassenger(passengerId)
+                    .map { it.toDomain() }
+
+                _uiState.value = MyRideRequestsUiState(
+                    requests = requests,
+                    rideTitles = buildRideRequestTitles(context, requests),
+                    reservationCounts = loadReservationCounts()
+                )
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = exception.message ?: "Could not load ride requests."
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleMatches(context: Context, requestId: String) {
+        if (_uiState.value.expandedRequestId == requestId) {
+            _uiState.update { it.copy(expandedRequestId = null, matchErrorMessage = null) }
+            return
+        }
+
+        val cachedMatches = _uiState.value.matchedOffers[requestId]
+        if (cachedMatches != null) {
+            _uiState.update {
+                it.copy(
+                    expandedRequestId = requestId,
+                    matchErrorMessage = null
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    expandedRequestId = requestId,
+                    loadingMatchesRequestId = requestId,
+                    matchErrorMessage = null
+                )
+            }
+
+            try {
+                val offerIds = rideMatchRepository
+                    .getMatchesByRequest(requestId)
+                    .map { it.rideOfferId }
+                    .toSet()
+                val offers = rideOfferRepository
+                    .getOffers()
+                    .map { it.toDomain() }
+                    .filter { it.id in offerIds }
+                val offerTitles = buildRideOfferTitles(context, offers)
+                val driverNames = loadDriverNames(offers)
+                val reservationCounts = loadReservationCounts()
+
+                _uiState.update {
+                    it.copy(
+                        loadingMatchesRequestId = null,
+                        matchedOffers = it.matchedOffers + (requestId to offers),
+                        matchedOfferTitles = it.matchedOfferTitles + offerTitles,
+                        driverNames = it.driverNames + driverNames,
+                        reservationCounts = reservationCounts
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        loadingMatchesRequestId = null,
+                        matchErrorMessage = exception.message ?: "Could not load matches."
+                    )
+                }
+            }
+        }
+    }
+
+    fun bookMatchedRide(requestId: String, offerId: String) {
+        val passengerId = supabase.auth.currentUserOrNull()?.id
+
+        if (passengerId == null) {
+            _uiState.update { it.copy(matchErrorMessage = "No logged in user found.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    bookingOfferId = offerId,
+                    matchErrorMessage = null
+                )
+            }
+
+            try {
+                val offer = _uiState.value.matchedOffers[requestId]
+                    ?.firstOrNull { it.id == offerId }
+                val currentReservationCount = reservationRepository.getReservations()
+                    .count { it.rideOfferId == offerId }
+
+                if (offer == null || currentReservationCount >= offer.vehicleCapacity) {
+                    _uiState.update {
+                        it.copy(
+                            bookingOfferId = null,
+                            matchErrorMessage = "No free spots available."
+                        )
+                    }
+                    return@launch
+                }
+
+                when (val result = reservationRepository.insert(ReservationEntity(offerId, passengerId))) {
+                    is GenericResult.Success -> {
+                        repository.delete(requestId)
+                        _uiState.update {
+                            it.copy(
+                                bookingOfferId = null,
+                                expandedRequestId = null,
+                                requests = it.requests.filterNot { request -> request.id == requestId },
+                                rideTitles = it.rideTitles - requestId,
+                                matchedOffers = it.matchedOffers - requestId,
+                                reservationCounts = it.reservationCounts + (offerId to currentReservationCount + 1),
+                                matchErrorMessage = null
+                            )
+                        }
+                    }
+
+                    is GenericResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                bookingOfferId = null,
+                                matchErrorMessage = result.error.toMessage()
+                            )
+                        }
+                    }
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        bookingOfferId = null,
+                        matchErrorMessage = exception.message ?: "Could not book ride."
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun loadDriverNames(offers: List<RideOffer>): Map<String, String> {
+        return offers
+            .map { it.driverId }
+            .distinct()
+            .mapNotNull { driverId ->
+                userRepository.getUser(driverId).getOrNull()?.let { driverId to it.name }
+            }
+            .toMap()
+    }
+
+    private suspend fun loadReservationCounts(): Map<String, Int> {
+        return reservationRepository.getReservations()
+            .groupingBy { it.rideOfferId }
+            .eachCount()
+    }
+}
+
+private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? {
+    return when (this) {
+        is com.project.sharist.data.model.GenericResult.Success -> data
+        is com.project.sharist.data.model.GenericResult.Error -> null
+    }
+}
+
+private fun AppError.toMessage(): String {
+    return when (this) {
+        AppError.Network -> "Network error while booking ride."
+        AppError.Conflict -> "You may already have booked this ride."
+        AppError.Unauthorized -> "You are not allowed to book this ride."
+        AppError.NotFound -> "Reservation table or ride offer was not found."
+        is AppError.Unknown -> message ?: "Could not book ride."
+    }
+}
