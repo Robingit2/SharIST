@@ -13,7 +13,7 @@ data class RideRequestUiState(
     val arrivalRadiusMeters: String = "",
     val desiredDepartureTimeMillis: Long? = null,
     val departureToleranceMinutes: String = "",
-    val recurringType: RecurringType = RecurringType.NONE,
+    val recurringType: RecurringType = RecurringType.ONCE,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val saved: Boolean = false

@@ -27,4 +27,14 @@ class ReservationRepository {
     suspend fun getReservations(): List<ReservationEntity> {
         return reservationsTable.select().decodeList()
     }
+
+    suspend fun getReservationsByOffers(offerIds: List<String>): List<ReservationEntity> {
+        if (offerIds.isEmpty()) return emptyList()
+
+        return reservationsTable.select {
+            filter {
+                isIn("ride_offer_id", offerIds)
+            }
+        }.decodeList()
+    }
 }

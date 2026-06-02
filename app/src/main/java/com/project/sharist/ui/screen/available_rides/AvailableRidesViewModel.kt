@@ -35,7 +35,7 @@ data class AvailableRidesUiState(
     val arrivalRadiusMeters: String = "",
     val desiredDepartureTimeMillis: Long? = null,
     val departureToleranceMinutes: String = "",
-    val recurringType: RecurringType = RecurringType.entries.first(),
+    val recurringType: RecurringType = RecurringType.ONCE,
     val isLoading: Boolean = false,
     val isBooking: Boolean = false,
     val errorMessage: String? = null,
@@ -43,7 +43,9 @@ data class AvailableRidesUiState(
     val results: List<RideOffer> = emptyList(),
     val driverNames: Map<String, String> = emptyMap(),
     val rideTitles: Map<String, String> = emptyMap(),
-    val reservationCounts: Map<String, Int> = emptyMap()
+    val reservationCounts: Map<String, Int> = emptyMap(),
+    val isLoadingMore: Boolean = false,
+    val hasMoreResults: Boolean = false
 )
 
 class AvailableRidesViewModel : ViewModel() {
@@ -52,6 +54,8 @@ class AvailableRidesViewModel : ViewModel() {
     private val userRepository: UserRepository = UserRepository()
     private val _uiState = MutableStateFlow(AvailableRidesUiState())
     val uiState: StateFlow<AvailableRidesUiState> = _uiState
+    private var activeFilter: RideRequest? = null
+    private var nextPage = 0
 
     fun updateDepartureAddress(value: String) = _uiState.update { it.copy(departureAddress = value) }
     fun updateDepartureLat(value: String) = _uiState.update { it.copy(departureLat = value) }
@@ -166,22 +170,36 @@ class AvailableRidesViewModel : ViewModel() {
 
     fun searchAvailableRides(context: Context) {
         val filter = uiState.value.toRideRequestOrError() ?: return
+        activeFilter = filter
+        nextPage = 0
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    results = emptyList(),
+                    driverNames = emptyMap(),
+                    rideTitles = emptyMap(),
+                    reservationCounts = emptyMap(),
+                    hasMoreResults = false
+                )
+            }
 
             try {
-                val offers = loadAvailableRides(filter)
+                val offers = loadAvailableRidesPage(filter, nextPage)
                 val driverNames = loadDriverNames(offers)
                 val rideTitles = buildRideOfferTitles(context, offers)
-                val reservationCounts = loadReservationCounts()
+                val reservationCounts = loadReservationCounts(offers)
+                nextPage += 1
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         results = offers,
                         driverNames = driverNames,
                         rideTitles = rideTitles,
-                        reservationCounts = reservationCounts
+                        reservationCounts = reservationCounts,
+                        hasMoreResults = offers.size == PAGE_SIZE
                     )
                 }
             } catch (exception: Exception) {
@@ -195,8 +213,48 @@ class AvailableRidesViewModel : ViewModel() {
         }
     }
 
-    private suspend fun loadAvailableRides(filter: RideRequest): List<RideOffer> {
-        return rideOfferRepository.getOffers(filter).map { it.toDomain() }
+    fun loadMoreAvailableRides(context: Context) {
+        val filter = activeFilter ?: return
+        val state = uiState.value
+
+        if (state.isLoading || state.isLoadingMore || !state.hasMoreResults) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true, errorMessage = null) }
+
+            try {
+                val offers = loadAvailableRidesPage(filter, nextPage)
+                val driverNames = loadDriverNames(offers)
+                val rideTitles = buildRideOfferTitles(context, offers)
+                val reservationCounts = loadReservationCounts(offers)
+                nextPage += 1
+
+                _uiState.update {
+                    it.copy(
+                        isLoadingMore = false,
+                        results = it.results + offers,
+                        driverNames = it.driverNames + driverNames,
+                        rideTitles = it.rideTitles + rideTitles,
+                        reservationCounts = it.reservationCounts + reservationCounts,
+                        hasMoreResults = offers.size == PAGE_SIZE
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingMore = false,
+                        errorMessage = exception.message ?: "Could not load more rides."
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun loadAvailableRidesPage(filter: RideRequest, page: Int): List<RideOffer> {
+        val from = page * PAGE_SIZE.toLong()
+        val to = from + PAGE_SIZE - 1
+
+        return rideOfferRepository.getOffers(filter, from, to).map { it.toDomain() }
     }
 
     private suspend fun loadDriverNames(offers: List<RideOffer>): Map<String, String> {
@@ -212,8 +270,8 @@ class AvailableRidesViewModel : ViewModel() {
             .toMap()
     }
 
-    private suspend fun loadReservationCounts(): Map<String, Int> {
-        return reservationRepository.getReservations()
+    private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
+        return reservationRepository.getReservationsByOffers(offers.map { it.id })
             .groupingBy { it.rideOfferId }
             .eachCount()
     }
@@ -256,6 +314,8 @@ class AvailableRidesViewModel : ViewModel() {
         )
     }
 }
+
+private const val PAGE_SIZE = 10
 
 private fun AppError.toMessage(): String {
     return when (this) {

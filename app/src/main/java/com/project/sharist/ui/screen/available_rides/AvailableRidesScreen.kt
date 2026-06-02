@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -27,10 +28,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.domain.model.RecurringType
@@ -46,6 +50,23 @@ fun AvailableRidesScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
+    val resultsListState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisibleIndex = resultsListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            lastVisibleIndex != null &&
+                lastVisibleIndex >= state.results.lastIndex - 2 &&
+                state.hasMoreResults &&
+                !state.isLoadingMore &&
+                !state.isLoading
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) {
+            viewModel.loadMoreAvailableRides(context)
+        }
+    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
@@ -149,6 +170,7 @@ fun AvailableRidesScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.height(320.dp),
+                state = resultsListState,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(state.results, key = { it.id }) { offer ->
@@ -161,6 +183,19 @@ fun AvailableRidesScreen(
                         isBooking = state.isBooking,
                         onBookClick = { viewModel.bookRide(offer.id) }
                     )
+                }
+
+                if (state.isLoadingMore) {
+                    item {
+                        Text(
+                            text = "Loading more rides...",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }

@@ -5,6 +5,7 @@ import com.project.sharist.data.model.ride.RideOfferEntity
 import com.project.sharist.domain.model.RideRequest
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
 import kotlin.math.cos
 import kotlin.math.max
 
@@ -55,6 +56,10 @@ class RideOfferRepository {
     }
 
     suspend fun getOffers(filter: RideRequest): List<RideOfferEntity> {
+        return getOffers(filter, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
+    }
+
+    suspend fun getOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
         val request = filter.toEntity()
         val departureBounds = coordinateBounds(request.departureLat, request.departureRadiusMeters)
         val arrivalBounds = coordinateBounds(request.arrivalLat, request.arrivalRadiusMeters)
@@ -80,6 +85,8 @@ class RideOfferRepository {
                     gte("arrival_longitude", request.arrivalLng - arrivalBounds.longitudeDelta)
                     lte("arrival_longitude", request.arrivalLng + arrivalBounds.longitudeDelta)
                 }
+                order("departure_time", Order.ASCENDING)
+                range(from, to)
             }
             .decodeList()
     }
@@ -122,3 +129,4 @@ private fun Long.toTimestampz(): String {
 
 private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
 private const val MIN_LONGITUDE_METERS_PER_DEGREE = 1.0
+private const val DEFAULT_FILTERED_LIMIT = 10L
