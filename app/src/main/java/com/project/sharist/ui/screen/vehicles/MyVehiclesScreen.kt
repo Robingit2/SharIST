@@ -146,13 +146,6 @@ private fun VehicleItem(
                     text = vehicle.plate,
                     style = MaterialTheme.typography.titleMedium
                 )
-
-                if (!vehicle.photoPath.isNullOrBlank()) {
-                    Text(
-                        text = vehicle.photoPath,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
             }
 
             OutlinedButton(onClick = onDeleteClick) {
