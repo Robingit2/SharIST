@@ -50,6 +50,18 @@ import com.project.sharist.ui.screen.vehicles.MyVehiclesScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
+import android.util.Log
+import com.project.sharist.ui.screen.favorite.FavoriteViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import com.project.sharist.data.model.favorite.FavoriteLocationEntity
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.Column
+
+
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNav() {
@@ -65,8 +77,11 @@ fun AppNav() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showDrawer = currentRoute != null &&
-        currentRoute != Screen.Login.route &&
-        currentRoute != Screen.Signup.route
+            currentRoute != Screen.Login.route &&
+            currentRoute != Screen.Signup.route
+
+    val favoriteViewModel: FavoriteViewModel = viewModel()
+    val favorites by favoriteViewModel.favorites.collectAsState()
 
     LaunchedEffect(showDrawer, currentRoute) {
         if (!showDrawer) return@LaunchedEffect
@@ -79,7 +94,11 @@ fun AppNav() {
             activeRole = roles.firstOrNull()
         }
     }
-
+    LaunchedEffect(activeRole, supabase.auth.currentUserOrNull()?.id) {
+        val userId = supabase.auth.currentUserOrNull()?.id ?: return@LaunchedEffect
+        Log.d("FAV_DEBUG", "userId = $userId")
+        favoriteViewModel.loadFavorites(userId)
+    }
     LaunchedEffect(showDrawer) {
         if (!showDrawer && drawerState.isOpen) {
             drawerState.close()
@@ -108,6 +127,7 @@ fun AppNav() {
                 navController = navController,
                 activeRole = activeRole ?: userRoles.firstOrNull() ?: RoleType.PASSENGER,
                 onLogout = onLogout,
+                favoriteViewModel = favoriteViewModel,
                 modifier = if (showDrawer && currentRoute != Screen.Home.route) {
                     Modifier.padding(top = 60.dp)
                 } else {
@@ -138,6 +158,8 @@ fun AppNav() {
                 AppDrawerContent(
                     activeRole = activeRole,
                     userRoles = userRoles,
+                    favorites = favorites,
+                    //favoriteViewModel = favoriteViewModel,
                     onProfileClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.Profile.route)
@@ -161,6 +183,16 @@ fun AppNav() {
                             launchSingleTop = true
                         }
                     },
+                    onFavoriteClick = { favorite ->
+                        scope.launch { drawerState.close() }
+                        favoriteViewModel.selectFavorite(favorite)
+                    },
+                    onDeleteFavorite = { id ->
+                        scope.launch {
+                            val userId = supabase.auth.currentUserOrNull()?.id ?: return@launch
+                            favoriteViewModel.removeFavorite(userId,id)
+                        }
+                    },
                     onLogoutClick = onLogout
                 )
             },
@@ -176,7 +208,8 @@ private fun AppNavHost(
     navController: NavHostController,
     activeRole: RoleType,
     onLogout: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    favoriteViewModel: FavoriteViewModel
 ) {
     NavHost(
         navController = navController,
@@ -189,9 +222,16 @@ private fun AppNavHost(
                     navController.navigate(Screen.Signup.route)
                 },
                 onLoginSuccess = {
+                    try {
+                    Log.d("LOGIN", "Navigating to Home")
+
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(0)
+                        launchSingleTop = true
                     }
+                } catch (e: Exception) {
+                    Log.e("LOGIN", "Navigation crash", e)
+                }
                 }
             )
         }
@@ -212,6 +252,7 @@ private fun AppNavHost(
         composable(Screen.Home.route) {
             HomeScreen(
                 role = activeRole,
+                favoriteViewModel = favoriteViewModel,
                 onCreateRideOfferClick = {
                     navController.navigate(Screen.RideOffer.route)
                 }
@@ -262,23 +303,99 @@ private fun AppDrawerContent(
     onReservationsClick: () -> Unit,
     onAvailableRidesClick: () -> Unit,
     onSwitchRoleClick: (RoleType) -> Unit,
-    onLogoutClick: () -> Unit
+    favorites: List<FavoriteLocationEntity>,
+    onFavoriteClick: (FavoriteLocationEntity) -> Unit,
+    onDeleteFavorite: (Long) -> Unit,
+
+    onLogoutClick: () -> Unit,
+    //favoriteViewModel: FavoriteViewModel,
 ) {
+    var favoritesExpanded by rememberSaveable { mutableStateOf(false) }
+
     ModalDrawerSheet {
         Text(
             text = activeRole?.name?.lowercase()?.replaceFirstChar { it.titlecase() } ?: "Menu",
             modifier = Modifier.padding(16.dp),
             style = MaterialTheme.typography.titleLarge
         )
-
+        Text("Favorites size: ${favorites.size}")
         DrawerItem("Profile", onProfileClick)
         DrawerItem("Settings", onSettingsClick)
         DrawerItem("History", onHistoryClick)
+        DrawerItem(
+            if (favoritesExpanded)
+                "- Favorite Locations"
+            else
+                "+ Favorite Locations"
+        ) {
+            favoritesExpanded = !favoritesExpanded
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
         Divider()
         Spacer(modifier = Modifier.height(8.dp))
+        /*if (favoritesExpanded) {
+            Column {
+                favorites.forEach { favorite ->
+                    NavigationDrawerItem(
+                        modifier = Modifier.padding(start = 24.dp),
+                        label = {
+                            Text(favorite.name ?: "Unnamed")
+                        },
+                        selected = false,
+                        onClick = {
+                            onFavoriteClick(favorite)
+                        }
+                    )
+                }
+            }
+        }*/
+        if (favoritesExpanded) {
+            Column {
+                favorites.forEach { favorite ->
 
+                    var menuExpanded by remember { mutableStateOf(false) }
+
+                    NavigationDrawerItem(
+                        modifier = Modifier.padding(start = 24.dp),
+                        label = {
+                            Text(favorite.name ?: "Unnamed")
+                        },
+                        selected = false,
+                        onClick = {
+                            onFavoriteClick(favorite)
+                        },
+                        badge = {
+                            Box {
+                                Text(
+                                    text = "..",
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .clickable {
+                                            menuExpanded = true
+                                        }
+                                )
+
+                                DropdownMenu(
+                                    expanded = menuExpanded,
+                                    onDismissRequest = { menuExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Delete") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            favorite.id?.let { id ->
+                                                onDeleteFavorite(id)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+        }
         when (activeRole) {
             RoleType.DRIVER -> {
                 DrawerItem("My vehicles", onMyVehiclesClick)

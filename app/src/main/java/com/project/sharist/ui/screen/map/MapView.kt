@@ -30,12 +30,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
+import com.project.sharist.supabase
+import io.github.jan.supabase.auth.auth
+
+
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.views.overlay.MapEventsOverlay
+import com.project.sharist.ui.screen.favorite.FavoriteViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+
+import android.widget.Toast
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun OpenStreetMapView(
-    weatherViewModel: WeatherViewModel
+    weatherViewModel: WeatherViewModel,
+    favoriteViewModel: FavoriteViewModel
 ) {
-
     val context = LocalContext.current
     val weatherState by weatherViewModel.state.collectAsState()
     // ---------------- PERMISSION ----------------
@@ -97,6 +112,80 @@ fun OpenStreetMapView(
     var weatherLoaded by remember {
         mutableStateOf(false)
     }
+    //********************
+    val selectedFavorite by favoriteViewModel.selectedLocation.collectAsState()
+
+    var selectedPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    var showDialog by remember { mutableStateOf(false) }
+    val favoriteMarker = remember {
+        Marker(mapView).apply {
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            title = "Favorite"
+            isDraggable = true
+        }
+    }
+
+    favoriteMarker.setOnMarkerDragListener(
+        object : Marker.OnMarkerDragListener {
+
+            override fun onMarkerDrag(marker: Marker?) {}
+
+            override fun onMarkerDragStart(marker: Marker?) {}
+
+            override fun onMarkerDragEnd(marker: Marker?) {
+                marker?.position?.let {
+                    selectedPoint = it
+                }
+            }
+        }
+    )
+
+    val longPressOverlay = remember {
+        MapEventsOverlay(
+            object : MapEventsReceiver {
+
+                override fun singleTapConfirmedHelper(p: GeoPoint?) = false
+
+                override fun longPressHelper(p: GeoPoint?): Boolean {
+
+                    p?.let {
+                        selectedPoint = it
+                        favoriteMarker.position = it
+
+                        if (!mapView.overlays.contains(favoriteMarker)) {
+                            mapView.overlays.add(favoriteMarker)
+                        }
+
+                        mapView.invalidate()
+                        showDialog = true
+                    }
+
+                    return true
+                }
+            }
+        )
+    }
+    LaunchedEffect(selectedFavorite) {
+        selectedFavorite?.let { favorite ->
+            val lat = favorite.latitude ?: return@let
+            val lng = favorite.longitude ?: return@let
+            val point = GeoPoint(lat, lng)
+
+            // Center map
+            mapView.controller.setCenter(point)
+            mapView.controller.setZoom(18.0)
+
+            // Update favorite marker
+            favoriteMarker.position = point
+            favoriteMarker.title = favorite.name ?: "Favorite"
+            if (!mapView.overlays.contains(favoriteMarker)) {
+                mapView.overlays.add(favoriteMarker)
+            }
+
+            mapView.invalidate()
+        }
+    }
+    //*************************
     // ---------------- LOCATION CALLBACK ----------------
     val locationCallback = remember {
         object : LocationCallback() {
@@ -124,6 +213,7 @@ fun OpenStreetMapView(
             }
         }
     }
+
 
     // ---------------- START LOCATION UPDATES (SAFE) ----------------
     fun startLocationUpdates() {
@@ -188,9 +278,19 @@ fun OpenStreetMapView(
     }
 
     // ---------------- ADD MARKER ONCE ----------------
+    /*LaunchedEffect(Unit) {
+        if (!mapView.overlays.contains(marker)) {
+            mapView.overlays.add(marker)
+        }
+    }*/
+    //**************
     LaunchedEffect(Unit) {
         if (!mapView.overlays.contains(marker)) {
             mapView.overlays.add(marker)
+        }
+
+        if (!mapView.overlays.contains(longPressOverlay)) {
+            mapView.overlays.add(longPressOverlay)
         }
     }
 
@@ -227,6 +327,60 @@ fun OpenStreetMapView(
                     forecast = weatherState.forecast
                 )
             }
+            //************
+        }
+        if (showDialog) {
+            var name by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = { Text("Save Favorite") },
+                text = {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = selectedPoint != null && name.isNotBlank(),
+                        onClick = {
+                            val userId = supabase.auth.currentUserOrNull()?.id
+
+                            if (userId != null) {
+                                selectedPoint?.let { point ->
+                                    Log.d("FAV_INSERT", "Trying insert: name=$name lat=${userId} lng=${point.longitude}")
+                                    favoriteViewModel.addFavorite(
+                                        userId = userId,
+                                        name = name.trim(),
+                                        lat = point.latitude,
+                                        lng = point.longitude
+                                    )
+                                }
+                            }
+                            showDialog = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                }
+                /*confirmButton = {
+                    TextButton(onClick = {
+                        selectedPoint?.let {
+                            Toast.makeText(context, "Clicked Save button", Toast.LENGTH_SHORT).show()
+                        }
+
+                        showDialog = false
+                    }) {
+                        Text("Save")
+                    }
+                }*/,
+                dismissButton = {
+                    TextButton(onClick = { showDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }

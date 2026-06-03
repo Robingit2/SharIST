@@ -9,6 +9,8 @@ class Navigation {
         object Profile : Screen("profile")
         object MyVehicles : Screen("my_vehicles")
         object RideOffer : Screen("ride_offer")
+        object Favorite : Screen("favorite")
         object MyRideOffers : Screen("my_ride_offers")
+
     }
 }

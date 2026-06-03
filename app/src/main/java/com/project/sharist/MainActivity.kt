@@ -13,7 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.project.sharist.ui.theme.SharISTTheme
 import com.project.sharist.ui.navigation.AppNav
+import com.project.sharist.ui.screen.weather.WeatherViewModel
+import androidx.activity.viewModels
+
+import android.content.Intent
 class MainActivity : ComponentActivity() {
+    private val weatherViewModel by viewModels<WeatherViewModel>()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -28,6 +33,10 @@ class MainActivity : ComponentActivity() {
                 }
             }*/
         }
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 }
 /*import android.Manifest
