@@ -44,6 +44,7 @@ data class AvailableRidesUiState(
     val driverNames: Map<String, String> = emptyMap(),
     val rideTitles: Map<String, String> = emptyMap(),
     val reservationCounts: Map<String, Int> = emptyMap(),
+    val bookedOfferIds: Set<String> = emptySet(),
     val isLoadingMore: Boolean = false,
     val hasMoreResults: Boolean = false
 )
@@ -89,12 +90,13 @@ class AvailableRidesViewModel : ViewModel() {
             try {
                 val offer = uiState.value.results.firstOrNull { it.id == offerId }
                 val currentReservationCount = reservationRepository.getReservationCountByOffer(offerId)
+                val isAlreadyBooked = offerId in uiState.value.bookedOfferIds
 
-                if (offer == null || currentReservationCount >= offer.vehicleCapacity) {
+                if (offer == null || isAlreadyBooked || currentReservationCount >= offer.vehicleCapacity) {
                     _uiState.update {
                         it.copy(
                             isBooking = false,
-                            errorMessage = "No free spots available."
+                            errorMessage = if (isAlreadyBooked) "You already booked this ride." else "No free spots available."
                         )
                     }
                     return@launch
@@ -106,7 +108,8 @@ class AvailableRidesViewModel : ViewModel() {
                             it.copy(
                                 isBooking = false,
                                 successMessage = "Ride booked.",
-                                reservationCounts = it.reservationCounts + (offerId to currentReservationCount + 1)
+                                reservationCounts = it.reservationCounts + (offerId to currentReservationCount + 1),
+                                bookedOfferIds = it.bookedOfferIds + offerId
                             )
                         }
                     }
@@ -181,6 +184,7 @@ class AvailableRidesViewModel : ViewModel() {
                     driverNames = emptyMap(),
                     rideTitles = emptyMap(),
                     reservationCounts = emptyMap(),
+                    bookedOfferIds = emptySet(),
                     hasMoreResults = false
                 )
             }
@@ -189,7 +193,7 @@ class AvailableRidesViewModel : ViewModel() {
                 val offers = loadAvailableRidesPage(filter, nextPage)
                 val driverNames = loadDriverNames(offers)
                 val rideTitles = buildRideOfferTitles(context, offers)
-                val reservationCounts = loadReservationCounts(offers)
+                val reservationMetadata = loadReservationMetadata(offers)
                 nextPage += 1
                 _uiState.update {
                     it.copy(
@@ -197,7 +201,8 @@ class AvailableRidesViewModel : ViewModel() {
                         results = offers,
                         driverNames = driverNames,
                         rideTitles = rideTitles,
-                        reservationCounts = reservationCounts,
+                        reservationCounts = reservationMetadata.takenSeats,
+                        bookedOfferIds = reservationMetadata.bookedOfferIds,
                         hasMoreResults = offers.size == PAGE_SIZE
                     )
                 }
@@ -225,7 +230,7 @@ class AvailableRidesViewModel : ViewModel() {
                 val offers = loadAvailableRidesPage(filter, nextPage)
                 val driverNames = loadDriverNames(offers)
                 val rideTitles = buildRideOfferTitles(context, offers)
-                val reservationCounts = loadReservationCounts(offers)
+                val reservationMetadata = loadReservationMetadata(offers)
                 nextPage += 1
 
                 _uiState.update {
@@ -234,7 +239,8 @@ class AvailableRidesViewModel : ViewModel() {
                         results = it.results + offers,
                         driverNames = it.driverNames + driverNames,
                         rideTitles = it.rideTitles + rideTitles,
-                        reservationCounts = it.reservationCounts + reservationCounts,
+                        reservationCounts = it.reservationCounts + reservationMetadata.takenSeats,
+                        bookedOfferIds = it.bookedOfferIds + reservationMetadata.bookedOfferIds,
                         hasMoreResults = offers.size == PAGE_SIZE
                     )
                 }
@@ -269,10 +275,17 @@ class AvailableRidesViewModel : ViewModel() {
             .toMap()
     }
 
-    private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
-        return reservationRepository.getReservationsByOffers(offers.map { it.id })
-            .groupingBy { it.rideOfferId }
-            .eachCount()
+    private suspend fun loadReservationMetadata(offers: List<RideOffer>): ReservationMetadata {
+        val passengerId = supabase.auth.currentUserOrNull()?.id
+        val reservations = reservationRepository.getReservationsByOffers(offers.map { it.id })
+
+        return ReservationMetadata(
+            takenSeats = reservations.groupingBy { it.rideOfferId }.eachCount(),
+            bookedOfferIds = reservations
+                .filter { it.passengerId == passengerId }
+                .map { it.rideOfferId }
+                .toSet()
+        )
     }
 
     private fun AvailableRidesUiState.toRideRequestOrError(): RideRequest? {
@@ -313,6 +326,11 @@ class AvailableRidesViewModel : ViewModel() {
         )
     }
 }
+
+private data class ReservationMetadata(
+    val takenSeats: Map<String, Int>,
+    val bookedOfferIds: Set<String>
+)
 
 private const val PAGE_SIZE = 10
 

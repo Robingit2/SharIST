@@ -180,6 +180,7 @@ fun AvailableRidesScreen(
                         freeSpots = (offer.vehicleCapacity - (state.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
                         driverName = state.driverNames[offer.driverId],
                         onDriverClick = onDriverClick,
+                        isAlreadyBooked = offer.id in state.bookedOfferIds,
                         isBooking = state.isBooking,
                         onBookClick = { viewModel.bookRide(offer.id) }
                     )
@@ -305,6 +306,7 @@ private fun RideOfferResultItem(
     freeSpots: Int,
     driverName: String?,
     onDriverClick: (String) -> Unit,
+    isAlreadyBooked: Boolean,
     isBooking: Boolean,
     onBookClick: () -> Unit
 ) {
@@ -330,9 +332,15 @@ private fun RideOfferResultItem(
             Button(
                 onClick = onBookClick,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isBooking && freeSpots > 0
+                enabled = !isAlreadyBooked && !isBooking && freeSpots > 0
             ) {
-                Text(if (freeSpots > 0) "Book ride" else "Fully booked")
+                Text(
+                    when {
+                        isAlreadyBooked -> "Already booked"
+                        freeSpots > 0 -> "Book ride"
+                        else -> "Fully booked"
+                    }
+                )
             }
         }
     }
