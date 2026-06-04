@@ -26,9 +26,10 @@ class UserRepository(
 
     suspend fun getUser(userId: String): GenericResult<User> {
         return safeSupabaseCall {
+            val now = System.currentTimeMillis()
             val cachedUser = userDao?.getUser(userId)
-            if (cachedUser != null) {
-                userDao.updateLastAccessed(userId, System.currentTimeMillis())
+            if (cachedUser != null && now - cachedUser.cacheFetchedAtMillis < USER_CACHE_TTL_MILLIS) {
+                userDao.updateLastAccessed(userId, now)
                 return@safeSupabaseCall cachedUser
             }
 
@@ -85,8 +86,12 @@ class UserRepository(
     }
 
     private suspend fun cacheUser(user: User) {
+        val now = System.currentTimeMillis()
         userDao?.insertUser(
-            user.copy(cacheLastAccessedAtMillis = System.currentTimeMillis())
+            user.copy(
+                cacheLastAccessedAtMillis = now,
+                cacheFetchedAtMillis = now
+            )
         )
         userDao?.trimToLimit(USER_CACHE_LIMIT)
     }
@@ -107,6 +112,7 @@ class UserRepository(
 }
 
 private const val USER_CACHE_LIMIT = 100
+private const val USER_CACHE_TTL_MILLIS = 15 * 60 * 1000L
 
 private fun String.toAvatarExtension(): String {
     return when (lowercase()) {

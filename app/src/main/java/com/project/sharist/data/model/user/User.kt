@@ -17,5 +17,7 @@ data class User (
     @SerialName("created_at")
     val createdAt: String? = null,
     @Transient
-    val cacheLastAccessedAtMillis: Long = 0L
+    val cacheLastAccessedAtMillis: Long = 0L,
+    @Transient
+    val cacheFetchedAtMillis: Long = 0L
 )

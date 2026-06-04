@@ -84,7 +84,7 @@ class ProfileViewModel(
             }
 
             try {
-                val user = userRepository.getUser(userId).getOrThrow("Unable to load user.")
+                val user = userRepository.refreshUser(userId).getOrThrow("Unable to load user.")
                 val roles = userRepository.getUserRoles(userId)
                 val vehicles = vehicleRepository.getVehiclesByUser(userId)
                 val ratingStats = ratingsRepository.getRatingStatsByTarget(userId).getOrThrow("Unable to load ratings.")
