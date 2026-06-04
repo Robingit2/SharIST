@@ -28,10 +28,8 @@ data class ProfileUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val user: User? = null,
-    val avatarBytes: ByteArray? = null,
     val roles: List<RoleType> = emptyList(),
     val vehicles: List<Vehicle> = emptyList(),
-    val vehiclePhotoBytes: Map<String, ByteArray> = emptyMap(),
     val comments: List<UserComment> = emptyList(),
     val commentAuthorNames: Map<String, String> = emptyMap(),
     val averageRating: Double = 0.0,
@@ -87,18 +85,8 @@ class ProfileViewModel(
 
             try {
                 val user = userRepository.getUser(userId).getOrThrow("Unable to load user.")
-                val avatarBytes = user.photoPath
-                    ?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
-                    ?.let { path ->
-                        try {
-                            userRepository.downloadAvatar(path)
-                        } catch (_: Exception) {
-                            null
-                        }
-                    }
                 val roles = userRepository.getUserRoles(userId)
                 val vehicles = vehicleRepository.getVehiclesByUser(userId)
-                val vehiclePhotoBytes = loadVehiclePhotos(vehicles)
                 val ratingStats = ratingsRepository.getRatingStatsByTarget(userId).getOrThrow("Unable to load ratings.")
                 nextCommentsPage = 0
                 val commentsPage = loadCommentsPage(userId, nextCommentsPage)
@@ -113,10 +101,8 @@ class ProfileViewModel(
 
                 _uiState.value = ProfileUiState(
                     user = user,
-                    avatarBytes = avatarBytes,
                     roles = roles,
                     vehicles = vehicles,
-                    vehiclePhotoBytes = vehiclePhotoBytes,
                     comments = comments,
                     commentAuthorNames = commentAuthorNames,
                     averageRating = ratingStats.averageRating,
@@ -290,18 +276,6 @@ class ProfileViewModel(
                 }
             }
         }
-    }
-
-    private suspend fun loadVehiclePhotos(vehicles: List<Vehicle>): Map<String, ByteArray> {
-        return vehicles.mapNotNull { vehicle ->
-            val path = vehicle.photoPath?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
-                ?: return@mapNotNull null
-            try {
-                vehicle.id to vehicleRepository.downloadVehiclePhoto(path)
-            } catch (_: Exception) {
-                null
-            }
-        }.toMap()
     }
 
     private suspend fun loadCommentAuthorNames(comments: List<UserComment>): Map<String, String> {

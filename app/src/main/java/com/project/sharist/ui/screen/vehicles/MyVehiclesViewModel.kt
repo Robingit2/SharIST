@@ -19,9 +19,11 @@ import kotlinx.coroutines.launch
 data class MyVehiclesUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val vehicles: List<Vehicle> = emptyList(),
-    val vehiclePhotoBytes: Map<String, ByteArray> = emptyMap()
-)
+    val vehicles: List<Vehicle> = emptyList()
+) {
+    val canAddVehicle: Boolean
+        get() = vehicles.size < MAX_VEHICLES_PER_USER
+}
 
 class MyVehiclesViewModel(
     private val vehicleRepository: VehicleRepository = VehicleRepository(),
@@ -46,8 +48,7 @@ class MyVehiclesViewModel(
             try {
                 val vehicles = vehicleRepository.getVehiclesByUser(userId)
                 _uiState.value = MyVehiclesUiState(
-                    vehicles = vehicles,
-                    vehiclePhotoBytes = loadVehiclePhotos(vehicles)
+                    vehicles = vehicles
                 )
             } catch (exception: Exception) {
                 _uiState.update {
@@ -70,6 +71,11 @@ class MyVehiclesViewModel(
 
         if (plate.isBlank()) {
             _uiState.update { it.copy(errorMessage = "Plate is required.") }
+            return
+        }
+
+        if (!_uiState.value.canAddVehicle) {
+            _uiState.update { it.copy(errorMessage = "You can add up to $MAX_VEHICLES_PER_USER vehicles.") }
             return
         }
 
@@ -97,18 +103,6 @@ class MyVehiclesViewModel(
         }
     }
 
-    private suspend fun loadVehiclePhotos(vehicles: List<Vehicle>): Map<String, ByteArray> {
-        return vehicles.mapNotNull { vehicle ->
-            val path = vehicle.photoPath?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
-                ?: return@mapNotNull null
-            try {
-                vehicle.id to vehicleRepository.downloadVehiclePhoto(path)
-            } catch (_: Exception) {
-                null
-            }
-        }.toMap()
-    }
-
     fun deleteVehicle(vehicleId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -127,3 +121,5 @@ class MyVehiclesViewModel(
         }
     }
 }
+
+const val MAX_VEHICLES_PER_USER = 10

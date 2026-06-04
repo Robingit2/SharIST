@@ -1,13 +1,9 @@
 package com.project.sharist.ui.screen.vehicles
 
 import android.content.Intent
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,13 +34,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.data.model.user.Vehicle
+import com.project.sharist.data.repository.VehicleRepository
+import com.project.sharist.ui.util.AuthenticatedImage
 
 @Composable
 fun MyVehiclesScreen(
@@ -78,10 +74,18 @@ fun MyVehiclesScreen(
 
             Button(
                 onClick = { showAddDialog = true },
-                enabled = !uiState.isLoading,
+                enabled = !uiState.isLoading && uiState.canAddVehicle,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Add vehicle")
+                Text(if (uiState.canAddVehicle) "Add vehicle" else "Vehicle limit reached")
+            }
+
+            if (!uiState.canAddVehicle) {
+                Text(
+                    text = "You can add up to $MAX_VEHICLES_PER_USER vehicles.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -95,7 +99,6 @@ fun MyVehiclesScreen(
                     items(uiState.vehicles) { vehicle ->
                         VehicleItem(
                             vehicle = vehicle,
-                            photoBytes = uiState.vehiclePhotoBytes[vehicle.id],
                             onDeleteClick = {
                                 viewModel.deleteVehicle(vehicle.id)
                             }
@@ -124,7 +127,6 @@ fun MyVehiclesScreen(
 @Composable
 private fun VehicleItem(
     vehicle: Vehicle,
-    photoBytes: ByteArray?,
     onDeleteClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -137,7 +139,6 @@ private fun VehicleItem(
         ) {
             VehiclePhoto(
                 photoPath = vehicle.photoPath,
-                photoBytes = photoBytes,
                 modifier = Modifier.size(72.dp)
             )
 
@@ -158,44 +159,23 @@ private fun VehicleItem(
 @Composable
 private fun VehiclePhoto(
     photoPath: String?,
-    photoBytes: ByteArray?,
     modifier: Modifier = Modifier
 ) {
-    val bitmap = remember(photoBytes) {
-        photoBytes
-            ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            ?.asImageBitmap()
-    }
+    val vehicleRepository = remember { VehicleRepository() }
 
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = "Vehicle photo",
-            modifier = modifier,
-            contentScale = ContentScale.Crop
-        )
-        return
-    }
-
-    if (photoPath.isNullOrBlank()) {
-        Box(
-            modifier = modifier,
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No photo", style = MaterialTheme.typography.bodySmall)
-        }
-        return
-    }
-
-    AndroidView(
+    AuthenticatedImage(
+        path = photoPath,
+        contentDescription = "Vehicle photo",
         modifier = modifier,
-        factory = { context ->
-            ImageView(context).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
+        contentScale = ContentScale.Crop,
+        loadBytes = vehicleRepository::downloadVehiclePhoto,
+        placeholder = {
+            Box(
+                modifier = modifier,
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No photo", style = MaterialTheme.typography.bodySmall)
             }
-        },
-        update = { imageView ->
-            imageView.setImageURI(Uri.parse(photoPath))
         }
     )
 }

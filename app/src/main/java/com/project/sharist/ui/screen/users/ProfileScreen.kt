@@ -1,10 +1,8 @@
 package com.project.sharist.ui.screen.users
 
 import android.content.Intent
-import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +60,9 @@ import com.project.sharist.data.model.review.UserComment
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.model.user.User
 import com.project.sharist.data.model.user.Vehicle
+import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.data.repository.VehicleRepository
+import com.project.sharist.ui.util.AuthenticatedImage
 import com.project.sharist.viewmodel.ProfileUiState
 import com.project.sharist.viewmodel.ProfileViewModel
 import java.util.Locale
@@ -204,8 +204,7 @@ private fun ProfileLoadedContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ProfileHeader(
-            user = uiState.user!!,
-            avatarBytes = uiState.avatarBytes
+            user = uiState.user!!
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -243,8 +242,7 @@ private fun ProfileLoadedContent(
 
         if (RoleType.DRIVER in uiState.roles) {
             VehiclesSection(
-                vehicles = uiState.vehicles,
-                vehiclePhotoBytes = uiState.vehiclePhotoBytes
+                vehicles = uiState.vehicles
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -290,38 +288,33 @@ private fun ProfileLoadedContent(
 
 @Composable
 private fun ProfileHeader(
-    user: User,
-    avatarBytes: ByteArray?
+    user: User
 ) {
-    val avatarBitmap = remember(avatarBytes) {
-        avatarBytes
-            ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            ?.asImageBitmap()
-    }
+    val userRepository = remember { UserRepository() }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (avatarBitmap != null) {
-            Image(
-                bitmap = avatarBitmap,
-                contentDescription = "Profile picture",
-                modifier = Modifier
-                    .size(112.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Default.AccountCircle,
-                contentDescription = "Profile picture",
-                modifier = Modifier
-                    .size(112.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
+        AuthenticatedImage(
+            path = user.photoPath,
+            contentDescription = "Profile picture",
+            modifier = Modifier
+                .size(112.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop,
+            loadBytes = userRepository::downloadAvatar,
+            placeholder = {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Profile picture",
+                    modifier = Modifier
+                        .size(112.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -671,8 +664,7 @@ private fun CommentItem(
 
 @Composable
 private fun VehiclesSection(
-    vehicles: List<Vehicle>,
-    vehiclePhotoBytes: Map<String, ByteArray>
+    vehicles: List<Vehicle>
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -694,8 +686,7 @@ private fun VehiclesSection(
             } else {
                 vehicles.forEach { vehicle ->
                     VehicleProfileItem(
-                        vehicle = vehicle,
-                        photoBytes = vehiclePhotoBytes[vehicle.id]
+                        vehicle = vehicle
                     )
                 }
             }
@@ -705,8 +696,7 @@ private fun VehiclesSection(
 
 @Composable
 private fun VehicleProfileItem(
-    vehicle: Vehicle,
-    photoBytes: ByteArray?
+    vehicle: Vehicle
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -720,7 +710,7 @@ private fun VehicleProfileItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             VehicleProfilePhoto(
-                photoBytes = photoBytes,
+                photoPath = vehicle.photoPath,
                 modifier = Modifier.size(64.dp)
             )
 
@@ -743,36 +733,32 @@ private fun VehicleProfileItem(
 
 @Composable
 private fun VehicleProfilePhoto(
-    photoBytes: ByteArray?,
+    photoPath: String?,
     modifier: Modifier = Modifier
 ) {
-    val bitmap = remember(photoBytes) {
-        photoBytes
-            ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            ?.asImageBitmap()
-    }
+    val vehicleRepository = remember { VehicleRepository() }
 
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = "Vehicle photo",
-            modifier = modifier.clip(MaterialTheme.shapes.small),
-            contentScale = ContentScale.Crop
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No photo",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    AuthenticatedImage(
+        path = photoPath,
+        contentDescription = "Vehicle photo",
+        modifier = modifier.clip(MaterialTheme.shapes.small),
+        contentScale = ContentScale.Crop,
+        loadBytes = vehicleRepository::downloadVehiclePhoto,
+        placeholder = {
+            Box(
+                modifier = modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No photo",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-    }
+    )
 }
 
 @Composable
