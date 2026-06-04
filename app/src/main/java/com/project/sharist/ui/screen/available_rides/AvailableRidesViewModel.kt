@@ -191,7 +191,25 @@ class AvailableRidesViewModel(
             }
 
             try {
-                val offers = loadAvailableRidesPage(filter, nextPage)
+                val cachedOffers = loadCachedAvailableRidesPage(filter, nextPage).distinctBy { it.id }
+                if (cachedOffers.isNotEmpty()) {
+                    val cachedDriverNames = loadDriverNames(cachedOffers)
+                    val cachedRideTitles = buildRideOfferTitles(context, cachedOffers)
+                    val cachedReservationMetadata = loadReservationMetadata(cachedOffers)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            results = cachedOffers,
+                            driverNames = cachedDriverNames,
+                            rideTitles = cachedRideTitles,
+                            reservationCounts = cachedReservationMetadata.takenSeats,
+                            bookedOfferIds = cachedReservationMetadata.bookedOfferIds,
+                            hasMoreResults = cachedOffers.size == PAGE_SIZE
+                        )
+                    }
+                }
+
+                val offers = refreshAvailableRidesPage(filter, nextPage).distinctBy { it.id }
                 val driverNames = loadDriverNames(offers)
                 val rideTitles = buildRideOfferTitles(context, offers)
                 val reservationMetadata = loadReservationMetadata(offers)
@@ -228,7 +246,11 @@ class AvailableRidesViewModel(
             _uiState.update { it.copy(isLoadingMore = true, errorMessage = null) }
 
             try {
-                val offers = loadAvailableRidesPage(filter, nextPage)
+                val remoteOffers = refreshAvailableRidesPage(filter, nextPage)
+                val existingOfferIds = state.results.map { it.id }.toSet()
+                val offers = remoteOffers
+                    .filterNot { it.id in existingOfferIds }
+                    .distinctBy { it.id }
                 val driverNames = loadDriverNames(offers)
                 val rideTitles = buildRideOfferTitles(context, offers)
                 val reservationMetadata = loadReservationMetadata(offers)
@@ -242,7 +264,7 @@ class AvailableRidesViewModel(
                         rideTitles = it.rideTitles + rideTitles,
                         reservationCounts = it.reservationCounts + reservationMetadata.takenSeats,
                         bookedOfferIds = it.bookedOfferIds + reservationMetadata.bookedOfferIds,
-                        hasMoreResults = offers.size == PAGE_SIZE
+                        hasMoreResults = remoteOffers.size == PAGE_SIZE
                     )
                 }
             } catch (exception: Exception) {
@@ -256,11 +278,18 @@ class AvailableRidesViewModel(
         }
     }
 
-    private suspend fun loadAvailableRidesPage(filter: RideRequest, page: Int): List<RideOffer> {
+    private suspend fun loadCachedAvailableRidesPage(filter: RideRequest, page: Int): List<RideOffer> {
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
 
-        return rideOfferRepository.getFilteredOffers(filter, from, to).map { it.toDomain() }
+        return rideOfferRepository.getCachedFilteredOffers(filter, from, to).map { it.toDomain() }
+    }
+
+    private suspend fun refreshAvailableRidesPage(filter: RideRequest, page: Int): List<RideOffer> {
+        val from = page * PAGE_SIZE.toLong()
+        val to = from + PAGE_SIZE - 1
+
+        return rideOfferRepository.refreshFilteredOffers(filter, from, to).map { it.toDomain() }
     }
 
     private suspend fun loadDriverNames(offers: List<RideOffer>): Map<String, String> {

@@ -39,6 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
+import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.data.usecase.auth.LogoutUserUseCase
 import com.project.sharist.supabase
@@ -66,7 +67,13 @@ fun AppNav() {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val userRepository = remember(context) { cachedUserRepository(context) }
-    val logoutUserUseCase = remember(context) { LogoutUserUseCase(userRepository) }
+    val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
+    val logoutUserUseCase = remember(context) {
+        LogoutUserUseCase(
+            userRepository = userRepository,
+            rideOfferRepository = rideOfferRepository
+        )
+    }
 
     var userRoles by remember { mutableStateOf<List<RoleType>>(emptyList()) }
     var activeRole by remember { mutableStateOf<RoleType?>(null) }

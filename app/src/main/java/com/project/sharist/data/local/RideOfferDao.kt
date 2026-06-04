@@ -120,6 +120,9 @@ interface RideOfferDao {
     @Query("DELETE FROM ride_offers WHERE id = :offerId")
     suspend fun deleteById(offerId: String)
 
+    @Query("DELETE FROM ride_offers")
+    suspend fun clearOffers()
+
     @Query("""
         DELETE FROM ride_offers
         WHERE id NOT IN (

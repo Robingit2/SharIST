@@ -70,7 +70,7 @@ class RideOfferRepository(
             limit = page.limit,
             offset = page.offset
         )
-        if (cachedOffers != null && cachedOffers.isNotEmpty()) {
+        if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
             markAccessed(cachedOffers)
             return cachedOffers
         }
@@ -108,7 +108,7 @@ class RideOfferRepository(
             limit = page.limit,
             offset = page.offset
         )
-        if (cachedOffers != null && cachedOffers.isNotEmpty()) {
+        if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
             markAccessed(cachedOffers)
             return cachedOffers
         }
@@ -137,7 +137,7 @@ class RideOfferRepository(
             limit = page.limit,
             offset = page.offset
         )
-        if (cachedOffers != null && cachedOffers.isNotEmpty()) {
+        if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
             markAccessed(cachedOffers)
             return cachedOffers
         }
@@ -154,20 +154,90 @@ class RideOfferRepository(
     }
 
     suspend fun getFilteredOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
-        val request = filter.toEntity()
-        val departureBounds = coordinateBounds(request.departureLat, request.departureRadiusMeters)
-        val arrivalBounds = coordinateBounds(request.arrivalLat, request.arrivalRadiusMeters)
-        val departureStart = (filter.desiredDepartureTimeMillis - filter.departureToleranceMinutes.minutesToMillis())
-            .toTimestampz()
-        val departureEnd = (filter.desiredDepartureTimeMillis + filter.departureToleranceMinutes.minutesToMillis())
-            .toTimestampz()
-        val now = System.currentTimeMillis().toTimestampz()
+        val query = filter.toOfferFilterQuery()
         val page = pageBounds(from, to)
 
-        val cachedOffers = rideOfferDao?.getFreshOffersMatchingFilter(
+        val cachedOffers = getCachedFilteredOffers(query, page)
+        if (cachedOffers.hasFullPage(page)) {
+            markAccessed(cachedOffers)
+            return cachedOffers
+        }
+
+        return fetchFilteredOffers(query, from, to)
+    }
+
+    suspend fun getCachedFilteredOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
+        val page = pageBounds(from, to)
+        val cachedOffers = getCachedFilteredOffers(filter.toOfferFilterQuery(), page)
+        markAccessed(cachedOffers)
+        return cachedOffers
+    }
+
+    suspend fun refreshFilteredOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
+        return fetchFilteredOffers(filter.toOfferFilterQuery(), from, to)
+    }
+
+    private suspend fun getCachedFilteredOffers(
+        query: OfferFilterQuery,
+        page: PageBounds
+    ): List<RideOfferEntity> {
+        return rideOfferDao?.getFreshOffersMatchingFilter(
+            excludedDriverId = query.excludedDriverId,
+            recurringType = query.recurringType,
+            now = query.now,
+            departureStart = query.departureStart,
+            departureEnd = query.departureEnd,
+            departureMinLat = query.departureMinLat,
+            departureMaxLat = query.departureMaxLat,
+            departureMinLng = query.departureMinLng,
+            departureMaxLng = query.departureMaxLng,
+            arrivalMinLat = query.arrivalMinLat,
+            arrivalMaxLat = query.arrivalMaxLat,
+            arrivalMinLng = query.arrivalMinLng,
+            arrivalMaxLng = query.arrivalMaxLng,
+            minFetchedAtMillis = minFreshFetchedAtMillis(),
+            limit = page.limit,
+            offset = page.offset
+        ).orEmpty()
+    }
+
+    private suspend fun fetchFilteredOffers(query: OfferFilterQuery, from: Long, to: Long): List<RideOfferEntity> {
+        return rideOffersTable
+            .select {
+                filter {
+                    neq("driver_id", query.excludedDriverId)
+                    eq("recurrence_type", query.recurringType)
+                    gte("departure_time", query.now)
+                    gte("departure_time", query.departureStart)
+                    lte("departure_time", query.departureEnd)
+                    gte("departure_latitude", query.departureMinLat)
+                    lte("departure_latitude", query.departureMaxLat)
+                    gte("departure_longitude", query.departureMinLng)
+                    lte("departure_longitude", query.departureMaxLng)
+                    gte("arrival_latitude", query.arrivalMinLat)
+                    lte("arrival_latitude", query.arrivalMaxLat)
+                    gte("arrival_longitude", query.arrivalMinLng)
+                    lte("arrival_longitude", query.arrivalMaxLng)
+                }
+                order("departure_time", Order.ASCENDING)
+                range(from, to)
+            }
+            .decodeList<RideOfferEntity>()
+            .also { offers -> cacheOffers(offers) }
+    }
+
+    private fun RideRequest.toOfferFilterQuery(): OfferFilterQuery {
+        val request = toEntity()
+        val departureBounds = coordinateBounds(request.departureLat, request.departureRadiusMeters)
+        val arrivalBounds = coordinateBounds(request.arrivalLat, request.arrivalRadiusMeters)
+        val departureStart = (desiredDepartureTimeMillis - departureToleranceMinutes.minutesToMillis())
+            .toTimestampz()
+        val departureEnd = (desiredDepartureTimeMillis + departureToleranceMinutes.minutesToMillis())
+            .toTimestampz()
+        return OfferFilterQuery(
             excludedDriverId = request.passengerId,
             recurringType = request.recurringType,
-            now = now,
+            now = System.currentTimeMillis().toTimestampz(),
             departureStart = departureStart,
             departureEnd = departureEnd,
             departureMinLat = request.departureLat - departureBounds.latitudeDelta,
@@ -177,38 +247,8 @@ class RideOfferRepository(
             arrivalMinLat = request.arrivalLat - arrivalBounds.latitudeDelta,
             arrivalMaxLat = request.arrivalLat + arrivalBounds.latitudeDelta,
             arrivalMinLng = request.arrivalLng - arrivalBounds.longitudeDelta,
-            arrivalMaxLng = request.arrivalLng + arrivalBounds.longitudeDelta,
-            minFetchedAtMillis = minFreshFetchedAtMillis(),
-            limit = page.limit,
-            offset = page.offset
+            arrivalMaxLng = request.arrivalLng + arrivalBounds.longitudeDelta
         )
-        if (!cachedOffers.isNullOrEmpty()) {
-            markAccessed(cachedOffers)
-            return cachedOffers
-        }
-
-        return rideOffersTable
-            .select {
-                filter {
-                    neq("driver_id", request.passengerId)
-                    eq("recurrence_type", request.recurringType)
-                    gte("departure_time", now)
-                    gte("departure_time", departureStart)
-                    lte("departure_time", departureEnd)
-                    gte("departure_latitude", request.departureLat - departureBounds.latitudeDelta)
-                    lte("departure_latitude", request.departureLat + departureBounds.latitudeDelta)
-                    gte("departure_longitude", request.departureLng - departureBounds.longitudeDelta)
-                    lte("departure_longitude", request.departureLng + departureBounds.longitudeDelta)
-                    gte("arrival_latitude", request.arrivalLat - arrivalBounds.latitudeDelta)
-                    lte("arrival_latitude", request.arrivalLat + arrivalBounds.latitudeDelta)
-                    gte("arrival_longitude", request.arrivalLng - arrivalBounds.longitudeDelta)
-                    lte("arrival_longitude", request.arrivalLng + arrivalBounds.longitudeDelta)
-                }
-                order("departure_time", Order.ASCENDING)
-                range(from, to)
-            }
-            .decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
     }
 
     suspend fun delete(offerId: String) {
@@ -218,6 +258,10 @@ class RideOfferRepository(
             }
         }
         rideOfferDao?.deleteById(offerId)
+    }
+
+    suspend fun clearCachedOffers() {
+        rideOfferDao?.clearOffers()
     }
 
     private suspend fun cacheOffers(offers: List<RideOfferEntity>) {
@@ -252,6 +296,22 @@ private data class CoordinateBounds(
     val longitudeDelta: Double
 )
 
+private data class OfferFilterQuery(
+    val excludedDriverId: String,
+    val recurringType: String,
+    val now: String,
+    val departureStart: String,
+    val departureEnd: String,
+    val departureMinLat: Double,
+    val departureMaxLat: Double,
+    val departureMinLng: Double,
+    val departureMaxLng: Double,
+    val arrivalMinLat: Double,
+    val arrivalMaxLat: Double,
+    val arrivalMinLng: Double,
+    val arrivalMaxLng: Double
+)
+
 private fun coordinateBounds(latitude: Double, radiusMeters: Int): CoordinateBounds {
     val latitudeDelta = radiusMeters / METERS_PER_LATITUDE_DEGREE
     val longitudeMetersPerDegree = max(
@@ -277,6 +337,10 @@ private fun pageBounds(from: Long, to: Long): PageBounds {
         limit = (to - from + 1).coerceAtLeast(0).toInt(),
         offset = from.coerceAtLeast(0).toInt()
     )
+}
+
+private fun List<RideOfferEntity>.hasFullPage(page: PageBounds): Boolean {
+    return size >= page.limit
 }
 
 private fun Long.toTimestampz(): String {
