@@ -16,31 +16,43 @@ class ReservationRepository {
         }
     }
 
-    suspend fun getReservationsByPassenger(passengerId: String): List<ReservationEntity> {
-        return reservationsTable.select {
-            filter {
-                eq("passenger_id", passengerId)
-            }
-        }.decodeList()
+    suspend fun getReservationsByPassenger(passengerId: String): GenericResult<List<ReservationEntity>> {
+        return safeSupabaseCall {
+            reservationsTable.select {
+                filter {
+                    eq("passenger_id", passengerId)
+                }
+            }.decodeList()
+        }
     }
 
-    suspend fun getReservationsByOffers(offerIds: List<String>): List<ReservationEntity> {
-        if (offerIds.isEmpty()) return emptyList()
+    suspend fun getReservationsByOffers(offerIds: List<String>): GenericResult<List<ReservationEntity>> {
+        if (offerIds.isEmpty()) return GenericResult.Success(emptyList())
 
-        return reservationsTable.select {
-            filter {
-                isIn("ride_offer_id", offerIds)
-            }
-        }.decodeList()
+        return safeSupabaseCall {
+            reservationsTable.select {
+                filter {
+                    isIn("ride_offer_id", offerIds)
+                }
+            }.decodeList()
+        }
     }
 
-    suspend fun getReservationCountByOffer(offerId: String): Int {
-        return getReservationsByOffers(listOf(offerId)).size
+    suspend fun getReservationCountByOffer(offerId: String): GenericResult<Int> {
+        return when (val result = getReservationsByOffers(listOf(offerId))) {
+            is GenericResult.Success -> GenericResult.Success(result.data.size)
+            is GenericResult.Error -> result
+        }
     }
 
-    suspend fun getReservationCountsByOffers(offerIds: List<String>): Map<String, Int> {
-        return getReservationsByOffers(offerIds)
-            .groupingBy { it.rideOfferId }
-            .eachCount()
+    suspend fun getReservationCountsByOffers(offerIds: List<String>): GenericResult<Map<String, Int>> {
+        return when (val result = getReservationsByOffers(offerIds)) {
+            is GenericResult.Success -> GenericResult.Success(
+                result.data
+                    .groupingBy { it.rideOfferId }
+                    .eachCount()
+            )
+            is GenericResult.Error -> result
+        }
     }
 }

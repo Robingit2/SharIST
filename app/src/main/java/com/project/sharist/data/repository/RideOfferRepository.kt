@@ -2,6 +2,8 @@ package com.project.sharist.data.repository
 
 import com.project.sharist.data.local.RideOfferDao
 import com.project.sharist.data.mapper.toEntity
+import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.ride.RideOfferEntity
 import com.project.sharist.domain.model.RideRequest
 import com.project.sharist.supabase
@@ -16,165 +18,185 @@ class RideOfferRepository(
 
     private val rideOffersTable = supabase.postgrest["ride_offers"]
 
-    suspend fun insert(offer: RideOfferEntity) {
-        rideOffersTable.insert(offer)
-        cacheOffers(listOf(offer))
-    }
-
-    suspend fun getFutureOffers(after: String): List<RideOfferEntity> {
-        return rideOffersTable.select {
-            filter {
-                gte("departure_time", after)
-            }
-        }.decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
-    }
-
-    suspend fun getFutureOffersByIds(offerIds: List<String>, after: String): List<RideOfferEntity> {
-        val ids = offerIds.distinct()
-        if (ids.isEmpty()) return emptyList()
-
-        val cachedOffers = rideOfferDao?.getFreshFutureOffersByIds(
-            offerIds = ids,
-            after = after,
-            minFetchedAtMillis = minFreshFetchedAtMillis()
-        )
-        if (cachedOffers != null && cachedOffers.size == ids.size) {
-            markAccessed(cachedOffers)
-            return cachedOffers
+    suspend fun insert(offer: RideOfferEntity): GenericResult<Unit> {
+        return safeSupabaseCall {
+            rideOffersTable.insert(offer)
+            cacheOffers(listOf(offer))
         }
-
-        return rideOffersTable.select {
-            filter {
-                isIn("id", ids)
-                gte("departure_time", after)
-            }
-            order("departure_time", Order.ASCENDING)
-        }.decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
     }
 
-    suspend fun getPastOffersByIds(offerIds: List<String>, before: String): List<RideOfferEntity> {
+    suspend fun getFutureOffers(after: String): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            rideOffersTable.select {
+                filter {
+                    gte("departure_time", after)
+                }
+            }.decodeList<RideOfferEntity>()
+                .also { offers -> cacheOffers(offers) }
+        }
+    }
+
+    suspend fun getFutureOffersByIds(offerIds: List<String>, after: String): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            val ids = offerIds.distinct()
+            if (ids.isEmpty()) return@safeSupabaseCall emptyList()
+
+            val cachedOffers = rideOfferDao?.getFreshFutureOffersByIds(
+                offerIds = ids,
+                after = after,
+                minFetchedAtMillis = minFreshFetchedAtMillis()
+            )
+            if (cachedOffers != null && cachedOffers.size == ids.size) {
+                markAccessed(cachedOffers)
+                return@safeSupabaseCall cachedOffers
+            }
+
+            rideOffersTable.select {
+                filter {
+                    isIn("id", ids)
+                    gte("departure_time", after)
+                }
+                order("departure_time", Order.ASCENDING)
+            }.decodeList<RideOfferEntity>()
+                .also { offers -> cacheOffers(offers) }
+        }
+    }
+
+    suspend fun getPastOffersByIds(offerIds: List<String>, before: String): GenericResult<List<RideOfferEntity>> {
         return getPastOffersByIds(offerIds, before, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
     }
 
-    suspend fun getPastOffersByIds(offerIds: List<String>, before: String, from: Long, to: Long): List<RideOfferEntity> {
-        val ids = offerIds.distinct()
-        if (ids.isEmpty()) return emptyList()
-        val page = pageBounds(from, to)
+    suspend fun getPastOffersByIds(offerIds: List<String>, before: String, from: Long, to: Long): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            val ids = offerIds.distinct()
+            if (ids.isEmpty()) return@safeSupabaseCall emptyList()
+            val page = pageBounds(from, to)
 
-        val cachedOffers = rideOfferDao?.getFreshPastOffersByIds(
-            offerIds = ids,
-            before = before,
-            minFetchedAtMillis = minFreshFetchedAtMillis(),
-            limit = page.limit,
-            offset = page.offset
-        )
-        if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
-            markAccessed(cachedOffers)
-            return cachedOffers
+            val cachedOffers = rideOfferDao?.getFreshPastOffersByIds(
+                offerIds = ids,
+                before = before,
+                minFetchedAtMillis = minFreshFetchedAtMillis(),
+                limit = page.limit,
+                offset = page.offset
+            )
+            if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
+                markAccessed(cachedOffers)
+                return@safeSupabaseCall cachedOffers
+            }
+
+            rideOffersTable.select {
+                filter {
+                    isIn("id", ids)
+                    lt("departure_time", before)
+                }
+                order("departure_time", Order.DESCENDING)
+                range(from, to)
+            }.decodeList<RideOfferEntity>()
+                .also { offers -> cacheOffers(offers) }
         }
-
-        return rideOffersTable.select {
-            filter {
-                isIn("id", ids)
-                lt("departure_time", before)
-            }
-            order("departure_time", Order.DESCENDING)
-            range(from, to)
-        }.decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
     }
 
-    suspend fun getOffersByDriver(driverId: String): List<RideOfferEntity> {
-        return rideOffersTable.select {
-            filter {
-                eq("driver_id", driverId)
-            }
-        }.decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
+    suspend fun getOffersByDriver(driverId: String): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            rideOffersTable.select {
+                filter {
+                    eq("driver_id", driverId)
+                }
+            }.decodeList<RideOfferEntity>()
+                .also { offers -> cacheOffers(offers) }
+        }
     }
 
-    suspend fun getFutureOffersByDriver(driverId: String, after: String): List<RideOfferEntity> {
+    suspend fun getFutureOffersByDriver(driverId: String, after: String): GenericResult<List<RideOfferEntity>> {
         return getFutureOffersByDriver(driverId, after, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
     }
 
-    suspend fun getFutureOffersByDriver(driverId: String, after: String, from: Long, to: Long): List<RideOfferEntity> {
-        val page = pageBounds(from, to)
-        val cachedOffers = rideOfferDao?.getFreshFutureOffersByDriver(
-            driverId = driverId,
-            after = after,
-            minFetchedAtMillis = minFreshFetchedAtMillis(),
-            limit = page.limit,
-            offset = page.offset
-        )
-        if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
-            markAccessed(cachedOffers)
-            return cachedOffers
-        }
-
-        return rideOffersTable.select {
-            filter {
-                eq("driver_id", driverId)
-                gte("departure_time", after)
+    suspend fun getFutureOffersByDriver(driverId: String, after: String, from: Long, to: Long): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            val page = pageBounds(from, to)
+            val cachedOffers = rideOfferDao?.getFreshFutureOffersByDriver(
+                driverId = driverId,
+                after = after,
+                minFetchedAtMillis = minFreshFetchedAtMillis(),
+                limit = page.limit,
+                offset = page.offset
+            )
+            if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
+                markAccessed(cachedOffers)
+                return@safeSupabaseCall cachedOffers
             }
-            order("departure_time", Order.ASCENDING)
-            range(from, to)
-        }.decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
+
+            rideOffersTable.select {
+                filter {
+                    eq("driver_id", driverId)
+                    gte("departure_time", after)
+                }
+                order("departure_time", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<RideOfferEntity>()
+                .also { offers -> cacheOffers(offers) }
+        }
     }
 
-    suspend fun getPastOffersByDriver(driverId: String, before: String): List<RideOfferEntity> {
+    suspend fun getPastOffersByDriver(driverId: String, before: String): GenericResult<List<RideOfferEntity>> {
         return getPastOffersByDriver(driverId, before, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
     }
 
-    suspend fun getPastOffersByDriver(driverId: String, before: String, from: Long, to: Long): List<RideOfferEntity> {
-        val page = pageBounds(from, to)
-        val cachedOffers = rideOfferDao?.getFreshPastOffersByDriver(
-            driverId = driverId,
-            before = before,
-            minFetchedAtMillis = minFreshFetchedAtMillis(),
-            limit = page.limit,
-            offset = page.offset
-        )
-        if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
-            markAccessed(cachedOffers)
-            return cachedOffers
-        }
-
-        return rideOffersTable.select {
-            filter {
-                eq("driver_id", driverId)
-                lt("departure_time", before)
+    suspend fun getPastOffersByDriver(driverId: String, before: String, from: Long, to: Long): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            val page = pageBounds(from, to)
+            val cachedOffers = rideOfferDao?.getFreshPastOffersByDriver(
+                driverId = driverId,
+                before = before,
+                minFetchedAtMillis = minFreshFetchedAtMillis(),
+                limit = page.limit,
+                offset = page.offset
+            )
+            if (cachedOffers != null && cachedOffers.hasFullPage(page)) {
+                markAccessed(cachedOffers)
+                return@safeSupabaseCall cachedOffers
             }
-            order("departure_time", Order.DESCENDING)
-            range(from, to)
-        }.decodeList<RideOfferEntity>()
-            .also { offers -> cacheOffers(offers) }
-    }
 
-    suspend fun getFilteredOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
-        val query = filter.toOfferFilterQuery()
-        val page = pageBounds(from, to)
-
-        val cachedOffers = getCachedFilteredOffers(query, page)
-        if (cachedOffers.hasFullPage(page)) {
-            markAccessed(cachedOffers)
-            return cachedOffers
+            rideOffersTable.select {
+                filter {
+                    eq("driver_id", driverId)
+                    lt("departure_time", before)
+                }
+                order("departure_time", Order.DESCENDING)
+                range(from, to)
+            }.decodeList<RideOfferEntity>()
+                .also { offers -> cacheOffers(offers) }
         }
-
-        return fetchFilteredOffers(query, from, to)
     }
 
-    suspend fun getCachedFilteredOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
-        val page = pageBounds(from, to)
-        val cachedOffers = getCachedFilteredOffers(filter.toOfferFilterQuery(), page)
-        markAccessed(cachedOffers)
-        return cachedOffers
+    suspend fun getFilteredOffers(filter: RideRequest, from: Long, to: Long): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            val query = filter.toOfferFilterQuery()
+            val page = pageBounds(from, to)
+
+            val cachedOffers = getCachedFilteredOffers(query, page)
+            if (cachedOffers.hasFullPage(page)) {
+                markAccessed(cachedOffers)
+                return@safeSupabaseCall cachedOffers
+            }
+
+            fetchFilteredOffers(query, from, to)
+        }
     }
 
-    suspend fun refreshFilteredOffers(filter: RideRequest, from: Long, to: Long): List<RideOfferEntity> {
-        return fetchFilteredOffers(filter.toOfferFilterQuery(), from, to)
+    suspend fun getCachedFilteredOffers(filter: RideRequest, from: Long, to: Long): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            val page = pageBounds(from, to)
+            val cachedOffers = getCachedFilteredOffers(filter.toOfferFilterQuery(), page)
+            markAccessed(cachedOffers)
+            cachedOffers
+        }
+    }
+
+    suspend fun refreshFilteredOffers(filter: RideRequest, from: Long, to: Long): GenericResult<List<RideOfferEntity>> {
+        return safeSupabaseCall {
+            fetchFilteredOffers(filter.toOfferFilterQuery(), from, to)
+        }
     }
 
     private suspend fun getCachedFilteredOffers(
@@ -251,17 +273,21 @@ class RideOfferRepository(
         )
     }
 
-    suspend fun delete(offerId: String) {
-        rideOffersTable.delete {
-            filter {
-                eq("id", offerId)
+    suspend fun delete(offerId: String): GenericResult<Unit> {
+        return safeSupabaseCall {
+            rideOffersTable.delete {
+                filter {
+                    eq("id", offerId)
+                }
             }
+            rideOfferDao?.deleteById(offerId)
         }
-        rideOfferDao?.deleteById(offerId)
     }
 
-    suspend fun clearCachedOffers() {
-        rideOfferDao?.clearOffers()
+    suspend fun clearCachedOffers(): GenericResult<Unit> {
+        return safeSupabaseCall {
+            rideOfferDao?.clearOffers()
+        }
     }
 
     private suspend fun cacheOffers(offers: List<RideOfferEntity>) {

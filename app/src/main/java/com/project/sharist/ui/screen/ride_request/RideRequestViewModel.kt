@@ -3,6 +3,8 @@ package com.project.sharist.ui.screen.ride_request
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.usecase.ride.InsertRideRequestUseCase
 import com.project.sharist.domain.model.LatLng
 import com.project.sharist.supabase
@@ -76,14 +78,12 @@ class RideRequestViewModel(
 
             _state.update { it.copy(isLoading = true, errorMessage = null, saved = false) }
 
-            try {
-                insertRideRequestUseCase(request)
-                _state.update { it.copy(isLoading = false, saved = true) }
-            } catch (exception: Exception) {
-                _state.update {
+            when (val result = insertRideRequestUseCase(request)) {
+                is GenericResult.Success -> _state.update { it.copy(isLoading = false, saved = true) }
+                is GenericResult.Error -> _state.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Could not save ride request."
+                        errorMessage = result.error.toMessage("Could not save ride request.")
                     )
                 }
             }

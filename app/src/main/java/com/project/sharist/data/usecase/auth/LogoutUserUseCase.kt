@@ -12,10 +12,17 @@ class LogoutUserUseCase(
     private val rideOfferRepository: RideOfferRepository
 ) {
     suspend operator fun invoke(): GenericResult<Unit> {
-        return safeSupabaseCall {
+        val signOutResult = safeSupabaseCall {
             supabase.auth.signOut()
-            userRepository.clearCachedUsers()
-            rideOfferRepository.clearCachedOffers()
         }
+
+        if (signOutResult is GenericResult.Error) return signOutResult
+
+        when (val result = userRepository.clearCachedUsers()) {
+            is GenericResult.Success -> Unit
+            is GenericResult.Error -> return result
+        }
+
+        return rideOfferRepository.clearCachedOffers()
     }
 }

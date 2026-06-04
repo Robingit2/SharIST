@@ -20,7 +20,6 @@ import kotlinx.serialization.Serializable
 class UserRepository(
     private val userDao: UserDao? = null
 ) {
-    // TODO Remove GenericResult
     private val usersTable = supabase.postgrest["users"]
     private val userRolesTable = supabase.postgrest["user_roles"]
 
@@ -53,36 +52,44 @@ class UserRepository(
         }
     }
 
-    suspend fun getUserRoles(userId: String): List<RoleType> {
-        val roleRows = userRolesTable.select(Columns.raw("roles (name)")) {
-            filter {
-                eq("user_id", userId)
-            }
-        }.decodeList<UserRoleNameRow>()
+    suspend fun getUserRoles(userId: String): GenericResult<List<RoleType>> {
+        return safeSupabaseCall {
+            val roleRows = userRolesTable.select(Columns.raw("roles (name)")) {
+                filter {
+                    eq("user_id", userId)
+                }
+            }.decodeList<UserRoleNameRow>()
 
-        return roleRows.mapNotNull { RoleType.from(it.role.name) }
-    }
-
-    suspend fun insert(user: User, userRoles: List<UserRole>) {
-        usersTable.insert(user)
-
-        if (userRoles.isNotEmpty()) {
-            userRolesTable.insert(userRoles)
+            roleRows.mapNotNull { RoleType.from(it.role.name) }
         }
     }
 
-    suspend fun updateProfile(userId: String, update: UserProfileUpdate) {
-        usersTable.update(update) {
-            filter {
-                eq("id", userId)
+    suspend fun insert(user: User, userRoles: List<UserRole>): GenericResult<Unit> {
+        return safeSupabaseCall {
+            usersTable.insert(user)
+
+            if (userRoles.isNotEmpty()) {
+                userRolesTable.insert(userRoles)
             }
         }
-
-        refreshUser(userId)
     }
 
-    suspend fun clearCachedUsers() {
-        userDao?.clearUsers()
+    suspend fun updateProfile(userId: String, update: UserProfileUpdate): GenericResult<Unit> {
+        return safeSupabaseCall {
+            usersTable.update(update) {
+                filter {
+                    eq("id", userId)
+                }
+            }
+
+            refreshUser(userId)
+        }
+    }
+
+    suspend fun clearCachedUsers(): GenericResult<Unit> {
+        return safeSupabaseCall {
+            userDao?.clearUsers()
+        }
     }
 
     private suspend fun cacheUser(user: User) {
@@ -96,14 +103,16 @@ class UserRepository(
         userDao?.trimToLimit(USER_CACHE_LIMIT)
     }
 
-    suspend fun uploadAvatar(context: Context, userId: String, uri: Uri): String {
-        val contentType = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val path = "users/$userId/avatar.${contentType.toAvatarExtension()}"
-        supabase.storage.from("avatars").upload(path, uri) {
-            upsert = true
-            this.contentType = ContentType.parse(contentType)
+    suspend fun uploadAvatar(context: Context, userId: String, uri: Uri): GenericResult<String> {
+        return safeSupabaseCall {
+            val contentType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val path = "users/$userId/avatar.${contentType.toAvatarExtension()}"
+            supabase.storage.from("avatars").upload(path, uri) {
+                upsert = true
+                this.contentType = ContentType.parse(contentType)
+            }
+            path
         }
-        return path
     }
 
     suspend fun downloadAvatar(path: String): ByteArray {

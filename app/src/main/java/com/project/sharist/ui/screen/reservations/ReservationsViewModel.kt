@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.model.getOrThrow
 import com.project.sharist.data.repository.ReservationRepository
 import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.data.repository.UserRepository
@@ -49,9 +51,11 @@ class ReservationsViewModel(
             try {
                 val reservedOfferIds = reservationRepository
                     .getReservationsByPassenger(passengerId)
+                    .getOrThrow("Could not load reservations.")
                     .map { it.rideOfferId }
                 val offers = rideOfferRepository
                     .getFutureOffersByIds(reservedOfferIds, System.currentTimeMillis().toTimestampz())
+                    .getOrThrow("Could not load reserved rides.")
                     .map { it.toDomain() }
 
                 _uiState.value = ReservationsUiState(
@@ -82,14 +86,9 @@ class ReservationsViewModel(
     }
 
     private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
-        return reservationRepository.getReservationCountsByOffers(offers.map { it.id })
-    }
-}
-
-private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? {
-    return when (this) {
-        is com.project.sharist.data.model.GenericResult.Success -> data
-        is com.project.sharist.data.model.GenericResult.Error -> null
+        return reservationRepository
+            .getReservationCountsByOffers(offers.map { it.id })
+            .getOrThrow("Could not load reservation counts.")
     }
 }
 

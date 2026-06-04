@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.getOrThrow
 import com.project.sharist.data.model.error.AppError
 import com.project.sharist.data.mapper.toDomain
 import com.project.sharist.data.model.ride.ReservationEntity
@@ -90,7 +91,9 @@ class AvailableRidesViewModel(
 
             try {
                 val offer = uiState.value.results.firstOrNull { it.id == offerId }
-                val currentReservationCount = reservationRepository.getReservationCountByOffer(offerId)
+                val currentReservationCount = reservationRepository
+                    .getReservationCountByOffer(offerId)
+                    .getOrThrow("Could not check available spots.")
                 val isAlreadyBooked = offerId in uiState.value.bookedOfferIds
 
                 if (offer == null || isAlreadyBooked || currentReservationCount >= offer.vehicleCapacity) {
@@ -282,14 +285,20 @@ class AvailableRidesViewModel(
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
 
-        return rideOfferRepository.getCachedFilteredOffers(filter, from, to).map { it.toDomain() }
+        return rideOfferRepository
+            .getCachedFilteredOffers(filter, from, to)
+            .getOrThrow("Could not load cached available rides.")
+            .map { it.toDomain() }
     }
 
     private suspend fun refreshAvailableRidesPage(filter: RideRequest, page: Int): List<RideOffer> {
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
 
-        return rideOfferRepository.refreshFilteredOffers(filter, from, to).map { it.toDomain() }
+        return rideOfferRepository
+            .refreshFilteredOffers(filter, from, to)
+            .getOrThrow("Could not refresh available rides.")
+            .map { it.toDomain() }
     }
 
     private suspend fun loadDriverNames(offers: List<RideOffer>): Map<String, String> {
@@ -307,7 +316,9 @@ class AvailableRidesViewModel(
 
     private suspend fun loadReservationMetadata(offers: List<RideOffer>): ReservationMetadata {
         val passengerId = supabase.auth.currentUserOrNull()?.id
-        val reservations = reservationRepository.getReservationsByOffers(offers.map { it.id })
+        val reservations = reservationRepository
+            .getReservationsByOffers(offers.map { it.id })
+            .getOrThrow("Could not load reservation metadata.")
 
         return ReservationMetadata(
             takenSeats = reservations.groupingBy { it.rideOfferId }.eachCount(),

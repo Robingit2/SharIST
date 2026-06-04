@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.model.getOrThrow
 import com.project.sharist.data.repository.ReservationRepository
 import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.data.repository.UserRepository
@@ -117,6 +119,7 @@ class MyRideOffersViewModel(
 
             try {
                 repository.delete(offer.id)
+                    .getOrThrow("Could not delete ride offer.")
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -139,6 +142,7 @@ class MyRideOffersViewModel(
 
     private suspend fun loadPassengerIdsByOffer(offerIds: Set<String>): Map<String, List<String>> {
         return reservationRepository.getReservationsByOffers(offerIds.toList())
+            .getOrThrow("Could not load reservations.")
             .groupBy(
                 keySelector = { it.rideOfferId },
                 valueTransform = { it.passengerId }
@@ -151,6 +155,7 @@ class MyRideOffersViewModel(
 
         return repository
             .getFutureOffersByDriver(driverId, System.currentTimeMillis().toTimestampz(), from, to)
+            .getOrThrow("Could not load ride offers.")
             .map { it.toDomain() }
     }
 
@@ -165,13 +170,6 @@ class MyRideOffersViewModel(
 }
 
 private const val PAGE_SIZE = 10
-
-private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? {
-    return when (this) {
-        is com.project.sharist.data.model.GenericResult.Success -> data
-        is com.project.sharist.data.model.GenericResult.Error -> null
-    }
-}
 
 private fun Long.toTimestampz(): String {
     return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.US)

@@ -3,6 +3,8 @@ package com.project.sharist.ui.screen.vehicles
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.model.user.AddVehicleInput
 import com.project.sharist.data.model.user.Vehicle
 import com.project.sharist.data.repository.VehicleRepository
@@ -46,10 +48,17 @@ class MyVehiclesViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
-                val vehicles = vehicleRepository.getVehiclesByUser(userId)
-                _uiState.value = MyVehiclesUiState(
-                    vehicles = vehicles
-                )
+                when (val result = vehicleRepository.getVehiclesByUser(userId)) {
+                    is GenericResult.Success -> _uiState.value = MyVehiclesUiState(
+                        vehicles = result.data
+                    )
+                    is GenericResult.Error -> _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.error.toMessage("Could not load vehicles.")
+                        )
+                    }
+                }
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
@@ -83,15 +92,22 @@ class MyVehiclesViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
-                addVehicleUseCase(
+                when (val result = addVehicleUseCase(
                     context,
                     AddVehicleInput(
                         plate = plate.trim(),
                         photoPath = photoPath?.trim()?.takeIf { it.isNotEmpty() },
                         userId = userId
                     )
-                )
-                loadVehicles()
+                )) {
+                    is GenericResult.Success -> loadVehicles()
+                    is GenericResult.Error -> _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.error.toMessage("Could not add vehicle.")
+                        )
+                    }
+                }
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
@@ -108,8 +124,15 @@ class MyVehiclesViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
-                removeVehicleUseCase(vehicleId)
-                loadVehicles()
+                when (val result = removeVehicleUseCase(vehicleId)) {
+                    is GenericResult.Success -> loadVehicles()
+                    is GenericResult.Error -> _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.error.toMessage("Could not delete vehicle.")
+                        )
+                    }
+                }
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(

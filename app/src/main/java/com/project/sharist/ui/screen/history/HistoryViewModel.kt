@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.mapper.toDomain
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.model.getOrThrow
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.repository.ReservationRepository
 import com.project.sharist.data.repository.RideOfferRepository
@@ -139,6 +141,7 @@ class HistoryViewModel(
             RoleType.PASSENGER -> loadPassengerHistory(userId, before, from, to)
             RoleType.DRIVER -> rideOfferRepository
                 .getPastOffersByDriver(userId, before, from, to)
+                .getOrThrow("Could not load driver history.")
                 .map { it.toDomain() }
         }
     }
@@ -146,10 +149,12 @@ class HistoryViewModel(
     private suspend fun loadPassengerHistory(passengerId: String, before: String, from: Long, to: Long): List<RideOffer> {
         val reservedOfferIds = reservationRepository
             .getReservationsByPassenger(passengerId)
+            .getOrThrow("Could not load passenger reservations.")
             .map { it.rideOfferId }
 
         return rideOfferRepository
             .getPastOffersByIds(reservedOfferIds, before, from, to)
+            .getOrThrow("Could not load passenger history.")
             .map { it.toDomain() }
     }
 
@@ -165,6 +170,7 @@ class HistoryViewModel(
 
     private suspend fun loadPassengerIdsByOffer(offerIds: Set<String>): Map<String, List<String>> {
         return reservationRepository.getReservationsByOffers(offerIds.toList())
+            .getOrThrow("Could not load reservations.")
             .groupBy(
                 keySelector = { it.rideOfferId },
                 valueTransform = { it.passengerId }
@@ -190,12 +196,5 @@ private fun Long.toTimestampz(): String {
 private fun timestampFormat(): SimpleDateFormat {
     return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
-    }
-}
-
-private fun <T> GenericResult<T>.getOrNull(): T? {
-    return when (this) {
-        is GenericResult.Success -> data
-        is GenericResult.Error -> null
     }
 }

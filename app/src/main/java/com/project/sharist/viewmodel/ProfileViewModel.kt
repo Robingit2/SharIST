@@ -3,6 +3,8 @@ package com.project.sharist.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.model.getOrThrow
 import com.project.sharist.data.model.review.UserComment
 import com.project.sharist.data.model.review.UserCommentInput
 import com.project.sharist.data.model.review.UserRatingInput
@@ -85,8 +87,8 @@ class ProfileViewModel(
 
             try {
                 val user = userRepository.refreshUser(userId).getOrThrow("Unable to load user.")
-                val roles = userRepository.getUserRoles(userId)
-                val vehicles = vehicleRepository.getVehiclesByUser(userId)
+                val roles = userRepository.getUserRoles(userId).getOrThrow("Unable to load roles.")
+                val vehicles = vehicleRepository.getVehiclesByUser(userId).getOrThrow("Unable to load vehicles.")
                 val ratingStats = ratingsRepository.getRatingStatsByTarget(userId).getOrThrow("Unable to load ratings.")
                 nextCommentsPage = 0
                 val commentsPage = loadCommentsPage(userId, nextCommentsPage)
@@ -293,6 +295,7 @@ class ProfileViewModel(
         val from = page * COMMENTS_PAGE_SIZE.toLong()
         val to = from + COMMENTS_PAGE_SIZE - 1
         val result = commentsRepository.getCommentsPageByTarget(targetId, from, to)
+            .getOrThrow("Unable to load comments.")
         nextCommentsPage = page + 1
 
         return CommentsPage(
@@ -310,20 +313,6 @@ private data class CommentsPage(
 )
 
 private const val COMMENTS_PAGE_SIZE = 10
-
-private fun <T> GenericResult<T>.getOrThrow(message: String): T {
-    return when (this) {
-        is GenericResult.Success -> data
-        is GenericResult.Error -> throw IllegalStateException(message)
-    }
-}
-
-private fun <T> GenericResult<T>.getOrNull(): T? {
-    return when (this) {
-        is GenericResult.Success -> data
-        is GenericResult.Error -> null
-    }
-}
 
 private fun com.project.sharist.data.model.error.AppError.toReviewMessage(fallback: String): String {
     return when (this) {

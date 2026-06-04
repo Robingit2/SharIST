@@ -39,6 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
+import com.project.sharist.data.model.getOrNull
 import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.data.repository.sessionRepository
@@ -102,7 +103,7 @@ fun AppNav() {
         if (!showDrawer) return@LaunchedEffect
 
         val currentUserId = supabase.auth.currentUserOrNull()?.id ?: return@LaunchedEffect
-        val roles = userRepository.getUserRoles(currentUserId)
+        val roles = userRepository.getUserRoles(currentUserId).getOrNull().orEmpty()
         val savedRole = getActiveRoleUseCase(currentUserId).first()
         val selectedRole = when {
             savedRole in roles -> savedRole

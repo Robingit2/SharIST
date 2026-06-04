@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.model.getOrThrow
 import com.project.sharist.data.mapper.toDomain
 import com.project.sharist.data.model.error.AppError
 import com.project.sharist.data.model.ride.ReservationEntity
@@ -249,7 +251,9 @@ class MyRideRequestsViewModel(
             try {
                 val offer = _uiState.value.matchedOffers[requestId]
                     ?.firstOrNull { it.id == offerId }
-                val currentReservationCount = reservationRepository.getReservationCountByOffer(offerId)
+                val currentReservationCount = reservationRepository
+                    .getReservationCountByOffer(offerId)
+                    .getOrThrow("Could not check available spots.")
 
                 if (offer == null || currentReservationCount >= offer.vehicleCapacity) {
                     _uiState.update {
@@ -264,6 +268,7 @@ class MyRideRequestsViewModel(
                 when (val result = reservationRepository.insert(ReservationEntity(offerId, passengerId))) {
                     is GenericResult.Success -> {
                         repository.delete(requestId)
+                            .getOrThrow("Could not delete ride request.")
                         nextMatchPageByRequest.remove(requestId)
                         _uiState.update {
                             it.copy(
@@ -310,7 +315,9 @@ class MyRideRequestsViewModel(
     }
 
     private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
-        return reservationRepository.getReservationCountsByOffers(offers.map { it.id })
+        return reservationRepository
+            .getReservationCountsByOffers(offers.map { it.id })
+            .getOrThrow("Could not load reservation counts.")
     }
 
     private suspend fun loadRequestsPage(passengerId: String, after: String, page: Int): List<RideRequest> {
@@ -319,16 +326,20 @@ class MyRideRequestsViewModel(
 
         return repository
             .getFutureRequestsByPassenger(passengerId, after, from, to)
+            .getOrThrow("Could not load ride requests.")
             .map { it.toDomain() }
     }
 
     private suspend fun loadMatchesPage(requestId: String, page: Int): MatchPage {
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
-        val matches = rideMatchRepository.getMatchesByRequest(requestId, from, to)
+        val matches = rideMatchRepository
+            .getMatchesByRequest(requestId, from, to)
+            .getOrThrow("Could not load matches.")
         val offerIds = matches.map { it.rideOfferId }
         val offers = rideOfferRepository
             .getFutureOffersByIds(offerIds, System.currentTimeMillis().toTimestampz())
+            .getOrThrow("Could not load matched offers.")
             .map { it.toDomain() }
 
         return MatchPage(
@@ -344,13 +355,6 @@ private data class MatchPage(
 )
 
 private const val PAGE_SIZE = 10
-
-private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? {
-    return when (this) {
-        is com.project.sharist.data.model.GenericResult.Success -> data
-        is com.project.sharist.data.model.GenericResult.Error -> null
-    }
-}
 
 private fun AppError.toMessage(): String {
     return when (this) {

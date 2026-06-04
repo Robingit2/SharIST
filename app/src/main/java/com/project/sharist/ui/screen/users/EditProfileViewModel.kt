@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.repository.UserProfileUpdate
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.supabase
@@ -96,19 +97,37 @@ class EditProfileViewModel(
             try {
                 val photoPath = state.photoPath.trim()
                 val savedPhotoPath = if (photoPath.startsWith("content://")) {
-                    userRepository.uploadAvatar(context, userId, Uri.parse(photoPath))
+                    when (val result = userRepository.uploadAvatar(context, userId, Uri.parse(photoPath))) {
+                        is GenericResult.Success -> result.data
+                        is GenericResult.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    errorMessage = result.error.toMessage("Could not upload profile photo.")
+                                )
+                            }
+                            return@launch
+                        }
+                    }
                 } else {
                     photoPath.takeIf { it.isNotEmpty() }
                 }
 
-                userRepository.updateProfile(
+                when (val result = userRepository.updateProfile(
                     userId = userId,
                     update = UserProfileUpdate(
                         name = state.name.trim(),
                         photoPath = savedPhotoPath
                     )
-                )
-                _uiState.update { it.copy(isLoading = false, saved = true) }
+                )) {
+                    is GenericResult.Success -> _uiState.update { it.copy(isLoading = false, saved = true) }
+                    is GenericResult.Error -> _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.error.toMessage("Could not save profile.")
+                        )
+                    }
+                }
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(

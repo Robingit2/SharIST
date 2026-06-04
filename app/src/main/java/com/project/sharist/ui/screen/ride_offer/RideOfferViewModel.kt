@@ -3,6 +3,8 @@ package com.project.sharist.ui.screen.ride_offer
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.usecase.ride.InsertRideOfferUseCase
 import com.project.sharist.domain.model.LatLng
 import com.project.sharist.domain.model.RecurringType
@@ -91,14 +93,12 @@ class RideOfferViewModel(
 
             _state.update { it.copy(isLoading = true, errorMessage = null, saved = false) }
 
-            try {
-                insertRideOfferUseCase(offer)
-                _state.update { it.copy(isLoading = false, saved = true) }
-            } catch (exception: Exception) {
-                _state.update {
+            when (val result = insertRideOfferUseCase(offer)) {
+                is GenericResult.Success -> _state.update { it.copy(isLoading = false, saved = true) }
+                is GenericResult.Error -> _state.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Could not save ride offer."
+                        errorMessage = result.error.toMessage("Could not save ride offer.")
                     )
                 }
             }

@@ -25,20 +25,22 @@ class UserCommentRepository {
         }
     }
 
-    suspend fun getCommentsPageByTarget(targetId: String, from: Long, to: Long): UserCommentsPage {
-        val result = userCommentsTable.select {
-            filter {
-                eq("target_user_id", targetId)
+    suspend fun getCommentsPageByTarget(targetId: String, from: Long, to: Long): GenericResult<UserCommentsPage> {
+        return safeSupabaseCall {
+            val result = userCommentsTable.select {
+                filter {
+                    eq("target_user_id", targetId)
+                }
+                order("created_at", Order.DESCENDING)
+                range(from, to)
+                count(Count.EXACT)
             }
-            order("created_at", Order.DESCENDING)
-            range(from, to)
-            count(Count.EXACT)
-        }
 
-        return UserCommentsPage(
-            comments = result.decodeList<UserComment>(),
-            totalCount = result.countOrNull()?.toInt() ?: 0
-        )
+            UserCommentsPage(
+                comments = result.decodeList<UserComment>(),
+                totalCount = result.countOrNull()?.toInt() ?: 0
+            )
+        }
     }
 
     suspend fun upsert(comment: UserComment) : GenericResult<Unit> {
