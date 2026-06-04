@@ -70,6 +70,23 @@ fun MyRideOffersScreen(
                         onDeleteClick = { viewModel.deleteOffer(offer) }
                     )
                 }
+
+                if (uiState.hasMoreOffers) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (uiState.isLoadingMore) {
+                                Text("Loading more...")
+                            } else {
+                                OutlinedButton(onClick = { viewModel.loadMoreOffers(context) }) {
+                                    Text("Load more")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

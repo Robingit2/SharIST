@@ -2,6 +2,7 @@ package com.project.sharist.ui.screen.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -76,6 +77,23 @@ fun HistoryScreen(
                             passengerNames = state.passengerNames,
                             onUserClick = onUserClick
                         )
+                    }
+
+                    if (state.hasMoreOffers) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (state.isLoadingMore) {
+                                    Text("Loading more...")
+                                } else {
+                                    OutlinedButton(onClick = { viewModel.loadMoreHistory(context, role) }) {
+                                        Text("Load more")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

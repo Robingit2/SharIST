@@ -76,11 +76,31 @@ fun MyRideRequestsScreen(
                             offerTitles = state.matchedOfferTitles,
                             driverNames = state.driverNames,
                             reservationCounts = state.reservationCounts,
+                            isLoadingMoreMatches = state.loadingMoreMatchesRequestId == request.id,
+                            hasMoreMatches = state.hasMoreMatchesByRequest[request.id] == true,
                             bookingOfferId = state.bookingOfferId,
                             onShowMatchesClick = { viewModel.toggleMatches(context, request.id) },
+                            onLoadMoreMatchesClick = { viewModel.loadMoreMatches(context, request.id) },
                             onDriverClick = onDriverClick,
                             onBookClick = { offerId -> viewModel.bookMatchedRide(request.id, offerId) }
                         )
+                    }
+
+                    if (state.hasMoreRequests) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (state.isLoadingMoreRequests) {
+                                    Text("Loading more...")
+                                } else {
+                                    OutlinedButton(onClick = { viewModel.loadMoreRequests(context) }) {
+                                        Text("Load more")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -99,8 +119,11 @@ private fun RideRequestItem(
     offerTitles: Map<String, String>,
     driverNames: Map<String, String>,
     reservationCounts: Map<String, Int>,
+    isLoadingMoreMatches: Boolean,
+    hasMoreMatches: Boolean,
     bookingOfferId: String?,
     onShowMatchesClick: () -> Unit,
+    onLoadMoreMatchesClick: () -> Unit,
     onDriverClick: (String) -> Unit,
     onBookClick: (String) -> Unit
 ) {
@@ -137,8 +160,11 @@ private fun RideRequestItem(
                     offerTitles = offerTitles,
                     driverNames = driverNames,
                     reservationCounts = reservationCounts,
+                    isLoadingMore = isLoadingMoreMatches,
+                    hasMoreMatches = hasMoreMatches,
                     bookingOfferId = bookingOfferId,
                     onDriverClick = onDriverClick,
+                    onLoadMoreClick = onLoadMoreMatchesClick,
                     onBookClick = onBookClick
                 )
             }
@@ -154,8 +180,11 @@ private fun MatchesSection(
     offerTitles: Map<String, String>,
     driverNames: Map<String, String>,
     reservationCounts: Map<String, Int>,
+    isLoadingMore: Boolean,
+    hasMoreMatches: Boolean,
     bookingOfferId: String?,
     onDriverClick: (String) -> Unit,
+    onLoadMoreClick: () -> Unit,
     onBookClick: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -164,17 +193,34 @@ private fun MatchesSection(
         when {
             isLoading -> CircularProgressIndicator()
             errorMessage != null -> Text(errorMessage, color = MaterialTheme.colorScheme.error)
-            matches.isEmpty() -> Text("No matches found yet.")
-            else -> matches.forEach { offer ->
-                MatchedOfferItem(
-                    offer = offer,
-                    title = offerTitles[offer.id],
-                    driverName = driverNames[offer.driverId],
-                    freeSpots = (offer.vehicleCapacity - (reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
-                    isBooking = bookingOfferId == offer.id,
-                    onDriverClick = { onDriverClick(offer.driverId) },
-                    onBookClick = { onBookClick(offer.id) }
-                )
+            matches.isEmpty() && !hasMoreMatches -> Text("No matches found yet.")
+            else -> {
+                matches.forEach { offer ->
+                    MatchedOfferItem(
+                        offer = offer,
+                        title = offerTitles[offer.id],
+                        driverName = driverNames[offer.driverId],
+                        freeSpots = (offer.vehicleCapacity - (reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
+                        isBooking = bookingOfferId == offer.id,
+                        onDriverClick = { onDriverClick(offer.driverId) },
+                        onBookClick = { onBookClick(offer.id) }
+                    )
+                }
+
+                if (hasMoreMatches) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (isLoadingMore) {
+                            Text("Loading more...")
+                        } else {
+                            OutlinedButton(onClick = onLoadMoreClick) {
+                                Text("Load more")
+                            }
+                        }
+                    }
+                }
             }
         }
     }

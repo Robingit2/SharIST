@@ -17,15 +17,42 @@ class RideOfferRepository {
         rideOffersTable.insert(offer)
     }
 
-    suspend fun getOffers(): List<RideOfferEntity> {
-        return rideOffersTable.select().decodeList()
-    }
-
     suspend fun getFutureOffers(after: String): List<RideOfferEntity> {
         return rideOffersTable.select {
             filter {
                 gte("departure_time", after)
             }
+        }.decodeList()
+    }
+
+    suspend fun getFutureOffersByIds(offerIds: List<String>, after: String): List<RideOfferEntity> {
+        val ids = offerIds.distinct()
+        if (ids.isEmpty()) return emptyList()
+
+        return rideOffersTable.select {
+            filter {
+                isIn("id", ids)
+                gte("departure_time", after)
+            }
+            order("departure_time", Order.ASCENDING)
+        }.decodeList()
+    }
+
+    suspend fun getPastOffersByIds(offerIds: List<String>, before: String): List<RideOfferEntity> {
+        return getPastOffersByIds(offerIds, before, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
+    }
+
+    suspend fun getPastOffersByIds(offerIds: List<String>, before: String, from: Long, to: Long): List<RideOfferEntity> {
+        val ids = offerIds.distinct()
+        if (ids.isEmpty()) return emptyList()
+
+        return rideOffersTable.select {
+            filter {
+                isIn("id", ids)
+                lt("departure_time", before)
+            }
+            order("departure_time", Order.DESCENDING)
+            range(from, to)
         }.decodeList()
     }
 
@@ -38,20 +65,32 @@ class RideOfferRepository {
     }
 
     suspend fun getFutureOffersByDriver(driverId: String, after: String): List<RideOfferEntity> {
+        return getFutureOffersByDriver(driverId, after, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
+    }
+
+    suspend fun getFutureOffersByDriver(driverId: String, after: String, from: Long, to: Long): List<RideOfferEntity> {
         return rideOffersTable.select {
             filter {
                 eq("driver_id", driverId)
                 gte("departure_time", after)
             }
+            order("departure_time", Order.ASCENDING)
+            range(from, to)
         }.decodeList()
     }
 
     suspend fun getPastOffersByDriver(driverId: String, before: String): List<RideOfferEntity> {
+        return getPastOffersByDriver(driverId, before, from = 0, to = DEFAULT_FILTERED_LIMIT - 1)
+    }
+
+    suspend fun getPastOffersByDriver(driverId: String, before: String, from: Long, to: Long): List<RideOfferEntity> {
         return rideOffersTable.select {
             filter {
                 eq("driver_id", driverId)
                 lt("departure_time", before)
             }
+            order("departure_time", Order.DESCENDING)
+            range(from, to)
         }.decodeList()
     }
 

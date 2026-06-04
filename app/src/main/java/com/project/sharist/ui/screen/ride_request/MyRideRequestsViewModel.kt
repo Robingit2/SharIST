@@ -31,12 +31,16 @@ data class MyRideRequestsUiState(
     val rideTitles: Map<String, String> = emptyMap(),
     val expandedRequestId: String? = null,
     val loadingMatchesRequestId: String? = null,
+    val loadingMoreMatchesRequestId: String? = null,
     val bookingOfferId: String? = null,
     val matchErrorMessage: String? = null,
     val matchedOffers: Map<String, List<RideOffer>> = emptyMap(),
     val matchedOfferTitles: Map<String, String> = emptyMap(),
     val driverNames: Map<String, String> = emptyMap(),
-    val reservationCounts: Map<String, Int> = emptyMap()
+    val reservationCounts: Map<String, Int> = emptyMap(),
+    val isLoadingMoreRequests: Boolean = false,
+    val hasMoreRequests: Boolean = false,
+    val hasMoreMatchesByRequest: Map<String, Boolean> = emptyMap()
 )
 
 class MyRideRequestsViewModel(
@@ -49,6 +53,9 @@ class MyRideRequestsViewModel(
 
     private val _uiState = MutableStateFlow(MyRideRequestsUiState())
     val uiState: StateFlow<MyRideRequestsUiState> = _uiState.asStateFlow()
+    private var nextRequestPage = 0
+    private var activeRequestsAfter: String? = null
+    private val nextMatchPageByRequest = mutableMapOf<String, Int>()
 
     fun loadRequests(context: Context) {
         val passengerId = supabase.auth.currentUserOrNull()?.id
@@ -62,19 +69,56 @@ class MyRideRequestsViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             try {
-                val requests = repository
-                    .getFutureRequestsByPassenger(passengerId, System.currentTimeMillis().toTimestampz())
-                    .map { it.toDomain() }
+                val after = System.currentTimeMillis().toTimestampz()
+                activeRequestsAfter = after
+                nextRequestPage = 0
+                nextMatchPageByRequest.clear()
+                val requests = loadRequestsPage(passengerId, after, nextRequestPage)
+                nextRequestPage += 1
 
                 _uiState.value = MyRideRequestsUiState(
                     requests = requests,
-                    rideTitles = buildRideRequestTitles(context, requests)
+                    rideTitles = buildRideRequestTitles(context, requests),
+                    hasMoreRequests = requests.size == PAGE_SIZE
                 )
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         errorMessage = exception.message ?: "Could not load ride requests."
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadMoreRequests(context: Context) {
+        val passengerId = supabase.auth.currentUserOrNull()?.id ?: return
+        val after = activeRequestsAfter ?: return
+        val state = _uiState.value
+
+        if (state.isLoading || state.isLoadingMoreRequests || !state.hasMoreRequests) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMoreRequests = true, errorMessage = null) }
+
+            try {
+                val requests = loadRequestsPage(passengerId, after, nextRequestPage)
+                nextRequestPage += 1
+
+                _uiState.update {
+                    it.copy(
+                        isLoadingMoreRequests = false,
+                        requests = it.requests + requests,
+                        rideTitles = it.rideTitles + buildRideRequestTitles(context, requests),
+                        hasMoreRequests = requests.size == PAGE_SIZE
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingMoreRequests = false,
+                        errorMessage = exception.message ?: "Could not load more ride requests."
                     )
                 }
             }
@@ -108,14 +152,10 @@ class MyRideRequestsViewModel(
             }
 
             try {
-                val offerIds = rideMatchRepository
-                    .getMatchesByRequest(requestId)
-                    .map { it.rideOfferId }
-                    .toSet()
-                val offers = rideOfferRepository
-                    .getFutureOffers(System.currentTimeMillis().toTimestampz())
-                    .map { it.toDomain() }
-                    .filter { it.id in offerIds }
+                nextMatchPageByRequest[requestId] = 0
+                val matchPage = loadMatchesPage(requestId, nextMatchPageByRequest.getValue(requestId))
+                nextMatchPageByRequest[requestId] = nextMatchPageByRequest.getValue(requestId) + 1
+                val offers = matchPage.offers
                 val offerTitles = buildRideOfferTitles(context, offers)
                 val driverNames = loadDriverNames(offers)
                 val reservationCounts = loadReservationCounts(offers)
@@ -126,7 +166,8 @@ class MyRideRequestsViewModel(
                         matchedOffers = it.matchedOffers + (requestId to offers),
                         matchedOfferTitles = it.matchedOfferTitles + offerTitles,
                         driverNames = it.driverNames + driverNames,
-                        reservationCounts = reservationCounts
+                        reservationCounts = it.reservationCounts + reservationCounts,
+                        hasMoreMatchesByRequest = it.hasMoreMatchesByRequest + (requestId to matchPage.hasMore)
                     )
                 }
             } catch (exception: Exception) {
@@ -134,6 +175,55 @@ class MyRideRequestsViewModel(
                     it.copy(
                         loadingMatchesRequestId = null,
                         matchErrorMessage = exception.message ?: "Could not load matches."
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadMoreMatches(context: Context, requestId: String) {
+        val state = _uiState.value
+
+        if (
+            state.loadingMatchesRequestId == requestId ||
+            state.loadingMoreMatchesRequestId == requestId ||
+            state.hasMoreMatchesByRequest[requestId] != true
+        ) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    loadingMoreMatchesRequestId = requestId,
+                    matchErrorMessage = null
+                )
+            }
+
+            try {
+                val page = nextMatchPageByRequest[requestId] ?: 0
+                val matchPage = loadMatchesPage(requestId, page)
+                nextMatchPageByRequest[requestId] = page + 1
+                val offers = matchPage.offers
+                val offerTitles = buildRideOfferTitles(context, offers)
+                val driverNames = loadDriverNames(offers)
+                val reservationCounts = loadReservationCounts(offers)
+
+                _uiState.update {
+                    it.copy(
+                        loadingMoreMatchesRequestId = null,
+                        matchedOffers = it.matchedOffers + (requestId to (it.matchedOffers[requestId].orEmpty() + offers)),
+                        matchedOfferTitles = it.matchedOfferTitles + offerTitles,
+                        driverNames = it.driverNames + driverNames,
+                        reservationCounts = it.reservationCounts + reservationCounts,
+                        hasMoreMatchesByRequest = it.hasMoreMatchesByRequest + (requestId to matchPage.hasMore)
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        loadingMoreMatchesRequestId = null,
+                        matchErrorMessage = exception.message ?: "Could not load more matches."
                     )
                 }
             }
@@ -174,6 +264,7 @@ class MyRideRequestsViewModel(
                 when (val result = reservationRepository.insert(ReservationEntity(offerId, passengerId))) {
                     is GenericResult.Success -> {
                         repository.delete(requestId)
+                        nextMatchPageByRequest.remove(requestId)
                         _uiState.update {
                             it.copy(
                                 bookingOfferId = null,
@@ -181,6 +272,7 @@ class MyRideRequestsViewModel(
                                 requests = it.requests.filterNot { request -> request.id == requestId },
                                 rideTitles = it.rideTitles - requestId,
                                 matchedOffers = it.matchedOffers - requestId,
+                                hasMoreMatchesByRequest = it.hasMoreMatchesByRequest - requestId,
                                 reservationCounts = it.reservationCounts + (offerId to currentReservationCount + 1),
                                 matchErrorMessage = null
                             )
@@ -220,7 +312,38 @@ class MyRideRequestsViewModel(
     private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
         return reservationRepository.getReservationCountsByOffers(offers.map { it.id })
     }
+
+    private suspend fun loadRequestsPage(passengerId: String, after: String, page: Int): List<RideRequest> {
+        val from = page * PAGE_SIZE.toLong()
+        val to = from + PAGE_SIZE - 1
+
+        return repository
+            .getFutureRequestsByPassenger(passengerId, after, from, to)
+            .map { it.toDomain() }
+    }
+
+    private suspend fun loadMatchesPage(requestId: String, page: Int): MatchPage {
+        val from = page * PAGE_SIZE.toLong()
+        val to = from + PAGE_SIZE - 1
+        val matches = rideMatchRepository.getMatchesByRequest(requestId, from, to)
+        val offerIds = matches.map { it.rideOfferId }
+        val offers = rideOfferRepository
+            .getFutureOffersByIds(offerIds, System.currentTimeMillis().toTimestampz())
+            .map { it.toDomain() }
+
+        return MatchPage(
+            offers = offers,
+            hasMore = matches.size == PAGE_SIZE
+        )
+    }
 }
+
+private data class MatchPage(
+    val offers: List<RideOffer>,
+    val hasMore: Boolean
+)
+
+private const val PAGE_SIZE = 10
 
 private fun <T> com.project.sharist.data.model.GenericResult<T>.getOrNull(): T? {
     return when (this) {

@@ -50,11 +50,9 @@ class ReservationsViewModel(
                 val reservedOfferIds = reservationRepository
                     .getReservationsByPassenger(passengerId)
                     .map { it.rideOfferId }
-                    .toSet()
                 val offers = rideOfferRepository
-                    .getFutureOffers(System.currentTimeMillis().toTimestampz())
+                    .getFutureOffersByIds(reservedOfferIds, System.currentTimeMillis().toTimestampz())
                     .map { it.toDomain() }
-                    .filter { it.id in reservedOfferIds }
 
                 _uiState.value = ReservationsUiState(
                     reservations = offers,
