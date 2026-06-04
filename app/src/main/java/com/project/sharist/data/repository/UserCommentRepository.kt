@@ -5,6 +5,8 @@ import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.review.UserComment
 import com.project.sharist.supabase
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Count
+import io.github.jan.supabase.postgrest.query.Order
 
 class UserCommentRepository {
 
@@ -33,13 +35,25 @@ class UserCommentRepository {
         }
     }
 
-    suspend fun getCommentsByTarget(targetId: String) : GenericResult<List<UserComment>> {
+    suspend fun getCommentsPageByTarget(targetId: String, from: Long, to: Long): UserCommentsPage {
+        val result = userCommentsTable.select {
+            filter {
+                eq("target_user_id", targetId)
+            }
+            order("created_at", Order.DESCENDING)
+            range(from, to)
+            count(Count.EXACT)
+        }
+
+        return UserCommentsPage(
+            comments = result.decodeList<UserComment>(),
+            totalCount = result.countOrNull()?.toInt() ?: 0
+        )
+    }
+
+    suspend fun getCommentsPageByTargetResult(targetId: String, from: Long, to: Long): GenericResult<UserCommentsPage> {
         return safeSupabaseCall {
-            userCommentsTable.select {
-                filter {
-                    eq("target_user_id", targetId)
-                }
-            }.decodeList<UserComment>()
+            getCommentsPageByTarget(targetId, from, to)
         }
     }
 
@@ -75,3 +89,10 @@ class UserCommentRepository {
 
 
 }
+
+data class UserCommentsPage(
+    val comments: List<UserComment>,
+    val totalCount: Int
+)
+
+private const val DEFAULT_PAGE_SIZE = 10L

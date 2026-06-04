@@ -122,7 +122,8 @@ fun ProfileScreen(
         onRatingChange = viewModel::updateRatingDraft,
         onSaveRating = viewModel::submitRating,
         onCommentChange = viewModel::updateCommentDraft,
-        onSaveComment = viewModel::submitComment
+        onSaveComment = viewModel::submitComment,
+        onLoadMoreComments = viewModel::loadMoreComments
     )
 
     if (showEditDialog) {
@@ -145,7 +146,8 @@ private fun ProfileContent(
     onRatingChange: (Int) -> Unit,
     onSaveRating: () -> Unit,
     onCommentChange: (String) -> Unit,
-    onSaveComment: () -> Unit
+    onSaveComment: () -> Unit,
+    onLoadMoreComments: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -176,7 +178,8 @@ private fun ProfileContent(
                 onRatingChange = onRatingChange,
                 onSaveRating = onSaveRating,
                 onCommentChange = onCommentChange,
-                onSaveComment = onSaveComment
+                onSaveComment = onSaveComment,
+                onLoadMoreComments = onLoadMoreComments
             )
         }
     }
@@ -191,7 +194,8 @@ private fun ProfileLoadedContent(
     onRatingChange: (Int) -> Unit,
     onSaveRating: () -> Unit,
     onCommentChange: (String) -> Unit,
-    onSaveComment: () -> Unit
+    onSaveComment: () -> Unit,
+    onLoadMoreComments: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -218,7 +222,7 @@ private fun ProfileLoadedContent(
         ProfileStats(
             averageRating = uiState.averageRating,
             ratingCount = uiState.ratingCount,
-            commentsCount = uiState.comments.size
+            commentsCount = uiState.commentsCount
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -265,7 +269,10 @@ private fun ProfileLoadedContent(
 
         CommentsSection(
             comments = uiState.comments,
-            authorNames = uiState.commentAuthorNames
+            authorNames = uiState.commentAuthorNames,
+            isLoadingMore = uiState.isLoadingMoreComments,
+            hasMoreComments = uiState.hasMoreComments,
+            onLoadMoreClick = onLoadMoreComments
         )
 
         if (uiState.isOwnProfile) {
@@ -585,7 +592,10 @@ private fun DetailRow(label: String, value: String) {
 @Composable
 private fun CommentsSection(
     comments: List<UserComment>,
-    authorNames: Map<String, String>
+    authorNames: Map<String, String>,
+    isLoadingMore: Boolean,
+    hasMoreComments: Boolean,
+    onLoadMoreClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -610,6 +620,21 @@ private fun CommentsSection(
                         comment = comment,
                         authorName = authorNames[comment.raterUserId] ?: "Unknown user"
                     )
+                }
+
+                if (hasMoreComments) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (isLoadingMore) {
+                            Text("Loading more...")
+                        } else {
+                            OutlinedButton(onClick = onLoadMoreClick) {
+                                Text("Load more")
+                            }
+                        }
+                    }
                 }
             }
         }

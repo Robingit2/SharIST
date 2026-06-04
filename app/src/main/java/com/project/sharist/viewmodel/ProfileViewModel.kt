@@ -11,6 +11,7 @@ import com.project.sharist.data.model.user.User
 import com.project.sharist.data.model.user.Vehicle
 import com.project.sharist.data.repository.UserCommentRepository
 import com.project.sharist.data.repository.UserRatingRepository
+import com.project.sharist.data.repository.UserRatingStats
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.repository.VehicleRepository
 import com.project.sharist.data.usecase.review.GiveOrUpdateCommentUseCase
@@ -36,6 +37,7 @@ data class ProfileUiState(
     val averageRating: Double = 0.0,
     val ratingCount: Int = 0,
     val ratingHistogram: Map<Int, Int> = emptyMap(),
+    val commentsCount: Int = 0,
     val isOwnProfile: Boolean = false,
     val profileUserId: String? = null,
     val currentUserId: String? = null,
@@ -43,6 +45,8 @@ data class ProfileUiState(
     val commentDraft: String = "",
     val isSavingRating: Boolean = false,
     val isSavingComment: Boolean = false,
+    val isLoadingMoreComments: Boolean = false,
+    val hasMoreComments: Boolean = false,
     val ratingMessage: String? = null,
     val commentMessage: String? = null
 )
@@ -58,6 +62,7 @@ class ProfileViewModel(
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+    private var nextCommentsPage = 0
 
     fun loadCurrentUserProfile() {
         val currentUserId = supabase.auth.currentUserOrNull()?.id
@@ -94,8 +99,10 @@ class ProfileViewModel(
                 val roles = userRepository.getUserRoles(userId)
                 val vehicles = vehicleRepository.getVehiclesByUser(userId)
                 val vehiclePhotoBytes = loadVehiclePhotos(vehicles)
-                val ratings = ratingsRepository.getRatingsByTarget(userId).getOrThrow("Unable to load ratings.")
-                val comments = commentsRepository.getCommentsByTarget(userId).getOrThrow("Unable to load comments.")
+                val ratingStats = ratingsRepository.getRatingStatsByTarget(userId).getOrThrow("Unable to load ratings.")
+                nextCommentsPage = 0
+                val commentsPage = loadCommentsPage(userId, nextCommentsPage)
+                val comments = commentsPage.comments
                 val commentAuthorNames = loadCommentAuthorNames(comments)
                 val ownRating = currentUserId
                     ?.takeIf { it != userId }
@@ -112,9 +119,11 @@ class ProfileViewModel(
                     vehiclePhotoBytes = vehiclePhotoBytes,
                     comments = comments,
                     commentAuthorNames = commentAuthorNames,
-                    averageRating = ratings.map { it.rating }.averageOrZero(),
-                    ratingCount = ratings.size,
-                    ratingHistogram = ratings.toHistogram(),
+                    averageRating = ratingStats.averageRating,
+                    ratingCount = ratingStats.ratingCount,
+                    ratingHistogram = ratingStats.histogram(),
+                    commentsCount = commentsPage.totalCount,
+                    hasMoreComments = commentsPage.hasMore,
                     isOwnProfile = userId == currentUserId,
                     profileUserId = userId,
                     currentUserId = currentUserId,
@@ -171,13 +180,13 @@ class ProfileViewModel(
                 )
             )) {
                 is GenericResult.Success -> {
-                    val ratings = ratingsRepository.getRatingsByTarget(targetId).getOrNull().orEmpty()
+                    val ratingStats = ratingsRepository.getRatingStatsByTarget(targetId).getOrNull() ?: UserRatingStats()
                     _uiState.update {
                         it.copy(
                             isSavingRating = false,
-                            averageRating = ratings.map { rating -> rating.rating }.averageOrZero(),
-                            ratingCount = ratings.size,
-                            ratingHistogram = ratings.toHistogram(),
+                            averageRating = ratingStats.averageRating,
+                            ratingCount = ratingStats.ratingCount,
+                            ratingHistogram = ratingStats.histogram(),
                             ratingMessage = "Rating saved."
                         )
                     }
@@ -222,13 +231,16 @@ class ProfileViewModel(
                 )
             )) {
                 is GenericResult.Success -> {
-                    val comments = commentsRepository.getCommentsByTarget(targetId).getOrNull().orEmpty()
-                    val commentAuthorNames = loadCommentAuthorNames(comments)
+                    nextCommentsPage = 0
+                    val commentsPage = loadCommentsPage(targetId, nextCommentsPage)
+                    val commentAuthorNames = loadCommentAuthorNames(commentsPage.comments)
                     _uiState.update {
                         it.copy(
                             isSavingComment = false,
-                            comments = comments,
+                            comments = commentsPage.comments,
                             commentAuthorNames = commentAuthorNames,
+                            commentsCount = commentsPage.totalCount,
+                            hasMoreComments = commentsPage.hasMore,
                             commentDraft = comment,
                             commentMessage = "Comment saved."
                         )
@@ -242,6 +254,39 @@ class ProfileViewModel(
                             commentMessage = result.error.toReviewMessage("Could not save comment.")
                         )
                     }
+                }
+            }
+        }
+    }
+
+    fun loadMoreComments() {
+        val targetId = uiState.value.profileUserId ?: return
+        val state = uiState.value
+
+        if (state.isLoading || state.isLoadingMoreComments || !state.hasMoreComments) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMoreComments = true, commentMessage = null) }
+
+            try {
+                val commentsPage = loadCommentsPage(targetId, nextCommentsPage)
+                val authorNames = loadCommentAuthorNames(commentsPage.comments)
+
+                _uiState.update {
+                    it.copy(
+                        isLoadingMoreComments = false,
+                        comments = it.comments + commentsPage.comments,
+                        commentAuthorNames = it.commentAuthorNames + authorNames,
+                        commentsCount = commentsPage.totalCount,
+                        hasMoreComments = commentsPage.hasMore
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingMoreComments = false,
+                        commentMessage = exception.message ?: "Unable to load more comments."
+                    )
                 }
             }
         }
@@ -269,17 +314,28 @@ class ProfileViewModel(
             }
             .toMap()
     }
-}
 
-private fun List<Int>.averageOrZero(): Double {
-    return if (isEmpty()) 0.0 else average()
-}
+    private suspend fun loadCommentsPage(targetId: String, page: Int): CommentsPage {
+        val from = page * COMMENTS_PAGE_SIZE.toLong()
+        val to = from + COMMENTS_PAGE_SIZE - 1
+        val result = commentsRepository.getCommentsPageByTarget(targetId, from, to)
+        nextCommentsPage = page + 1
 
-private fun List<com.project.sharist.data.model.review.UserRating>.toHistogram(): Map<Int, Int> {
-    return (1..5).associateWith { ratingValue ->
-        count { it.rating == ratingValue }
+        return CommentsPage(
+            comments = result.comments,
+            totalCount = result.totalCount,
+            hasMore = to + 1 < result.totalCount
+        )
     }
 }
+
+private data class CommentsPage(
+    val comments: List<UserComment>,
+    val totalCount: Int,
+    val hasMore: Boolean
+)
+
+private const val COMMENTS_PAGE_SIZE = 10
 
 private fun <T> GenericResult<T>.getOrThrow(message: String): T {
     return when (this) {
