@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RideOffer
 import java.text.SimpleDateFormat
@@ -33,9 +34,13 @@ fun ReservationsScreen(
     onDriverClick: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
     val userRepository = remember(context) { cachedUserRepository(context) }
     val viewModel: ReservationsViewModel = viewModel(
-        factory = ReservationsViewModelFactory(userRepository)
+        factory = ReservationsViewModelFactory(
+            rideOfferRepository = rideOfferRepository,
+            userRepository = userRepository
+        )
     )
     val state by viewModel.uiState.collectAsState()
 

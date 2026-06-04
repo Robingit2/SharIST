@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RecurringType
 import com.project.sharist.domain.model.RideOffer
@@ -49,9 +50,13 @@ fun AvailableRidesScreen(
     onDriverClick: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
     val userRepository = remember(context) { cachedUserRepository(context) }
     val viewModel: AvailableRidesViewModel = viewModel(
-        factory = AvailableRidesViewModelFactory(userRepository)
+        factory = AvailableRidesViewModelFactory(
+            rideOfferRepository = rideOfferRepository,
+            userRepository = userRepository
+        )
     )
     val state by viewModel.uiState.collectAsState()
     val resultsListState = rememberLazyListState()

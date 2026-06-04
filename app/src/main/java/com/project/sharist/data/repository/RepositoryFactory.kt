@@ -8,3 +8,9 @@ fun cachedUserRepository(context: Context): UserRepository {
         userDao = DatabaseProvider.getDatabase(context).userDao()
     )
 }
+
+fun cachedRideOfferRepository(context: Context): RideOfferRepository {
+    return RideOfferRepository(
+        rideOfferDao = DatabaseProvider.getDatabase(context).rideOfferDao()
+    )
+}

@@ -46,7 +46,7 @@ data class MyRideRequestsUiState(
 class MyRideRequestsViewModel(
     private val repository: RideRequestRepository = RideRequestRepository(),
     private val rideMatchRepository: RideMatchRepository = RideMatchRepository(),
-    private val rideOfferRepository: RideOfferRepository = RideOfferRepository(),
+    private val rideOfferRepository: RideOfferRepository,
     private val reservationRepository: ReservationRepository = ReservationRepository(),
     private val userRepository: UserRepository
 ) : ViewModel() {

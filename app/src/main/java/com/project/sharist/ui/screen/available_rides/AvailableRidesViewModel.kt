@@ -50,7 +50,7 @@ data class AvailableRidesUiState(
 )
 
 class AvailableRidesViewModel(
-    private val rideOfferRepository: RideOfferRepository = RideOfferRepository(),
+    private val rideOfferRepository: RideOfferRepository,
     private val reservationRepository: ReservationRepository = ReservationRepository(),
     private val userRepository: UserRepository
 ) : ViewModel() {
@@ -260,7 +260,7 @@ class AvailableRidesViewModel(
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
 
-        return rideOfferRepository.getOffers(filter, from, to).map { it.toDomain() }
+        return rideOfferRepository.getFilteredOffers(filter, from, to).map { it.toDomain() }
     }
 
     private suspend fun loadDriverNames(offers: List<RideOffer>): Map<String, String> {

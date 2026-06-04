@@ -36,7 +36,7 @@ data class HistoryUiState(
 )
 
 class HistoryViewModel(
-    private val rideOfferRepository: RideOfferRepository = RideOfferRepository(),
+    private val rideOfferRepository: RideOfferRepository,
     private val reservationRepository: ReservationRepository = ReservationRepository(),
     private val userRepository: UserRepository
 ) : ViewModel() {
