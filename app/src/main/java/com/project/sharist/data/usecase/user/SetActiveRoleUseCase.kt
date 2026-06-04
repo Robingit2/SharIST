@@ -15,6 +15,6 @@ class SetActiveRoleUseCase (
             throw IllegalArgumentException("User doesn't have this role")
         }
 
-        sessionRepository.setActiveRole(role)
+        sessionRepository.setActiveRole(userId, role)
     }
 }

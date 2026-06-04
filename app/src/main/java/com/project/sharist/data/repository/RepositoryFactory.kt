@@ -1,7 +1,10 @@
 package com.project.sharist.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.preferencesDataStore
 import com.project.sharist.data.local.DatabaseProvider
+
+private val Context.sessionDataStore by preferencesDataStore(name = "session")
 
 fun cachedUserRepository(context: Context): UserRepository {
     return UserRepository(
@@ -13,4 +16,8 @@ fun cachedRideOfferRepository(context: Context): RideOfferRepository {
     return RideOfferRepository(
         rideOfferDao = DatabaseProvider.getDatabase(context).rideOfferDao()
     )
+}
+
+fun sessionRepository(context: Context): SessionRepository {
+    return SessionRepository(context.applicationContext.sessionDataStore)
 }

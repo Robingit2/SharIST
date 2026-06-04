@@ -41,7 +41,10 @@ import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
+import com.project.sharist.data.repository.sessionRepository
 import com.project.sharist.data.usecase.auth.LogoutUserUseCase
+import com.project.sharist.data.usecase.user.GetActiveRoleUseCase
+import com.project.sharist.data.usecase.user.SetActiveRoleUseCase
 import com.project.sharist.supabase
 import com.project.sharist.ui.navigation.Navigation.Screen
 import com.project.sharist.ui.screen.available_rides.AvailableRidesScreen
@@ -57,6 +60,7 @@ import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.users.ProfileScreen
 import com.project.sharist.ui.screen.vehicles.MyVehiclesScreen
 import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +72,16 @@ fun AppNav() {
     val scope = rememberCoroutineScope()
     val userRepository = remember(context) { cachedUserRepository(context) }
     val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
+    val sessionRepository = remember(context) { sessionRepository(context) }
+    val getActiveRoleUseCase = remember(sessionRepository) {
+        GetActiveRoleUseCase(sessionRepository)
+    }
+    val setActiveRoleUseCase = remember(userRepository, sessionRepository) {
+        SetActiveRoleUseCase(
+            userRepository = userRepository,
+            sessionRepository = sessionRepository
+        )
+    }
     val logoutUserUseCase = remember(context) {
         LogoutUserUseCase(
             userRepository = userRepository,
@@ -89,10 +103,17 @@ fun AppNav() {
 
         val currentUserId = supabase.auth.currentUserOrNull()?.id ?: return@LaunchedEffect
         val roles = userRepository.getUserRoles(currentUserId)
+        val savedRole = getActiveRoleUseCase(currentUserId).first()
+        val selectedRole = when {
+            savedRole in roles -> savedRole
+            activeRole in roles -> activeRole
+            else -> roles.firstOrNull()
+        }
 
         userRoles = roles
-        if (activeRole !in roles) {
-            activeRole = roles.firstOrNull()
+        activeRole = selectedRole
+        if (selectedRole != null && selectedRole != savedRole) {
+            setActiveRoleUseCase(currentUserId, selectedRole)
         }
     }
 
@@ -190,10 +211,16 @@ fun AppNav() {
                         navController.navigate(Screen.AvailableRides.route)
                     },
                     onSwitchRoleClick = { role ->
-                        activeRole = role
-                        scope.launch { drawerState.close() }
-                        navController.navigate(Screen.Home.route) {
-                            launchSingleTop = true
+                        val currentUserId = supabase.auth.currentUserOrNull()?.id
+                        if (currentUserId != null) {
+                            scope.launch {
+                                setActiveRoleUseCase(currentUserId, role)
+                                activeRole = role
+                                drawerState.close()
+                                navController.navigate(Screen.Home.route) {
+                                    launchSingleTop = true
+                                }
+                            }
                         }
                     },
                     onLogoutClick = onLogout

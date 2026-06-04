@@ -11,19 +11,19 @@ import kotlinx.coroutines.flow.map
 class SessionRepository (
     private val dataStore: DataStore<Preferences>
 ) {
-    companion object {
-        val ACTIVE_ROLE = stringPreferencesKey("active_role")
-    }
-
-    suspend fun setActiveRole(role: RoleType) {
+    suspend fun setActiveRole(userId: String, role: RoleType) {
         dataStore.edit {
-            it[ACTIVE_ROLE] = role.name
+            it[activeRoleKey(userId)] = role.name
         }
     }
 
-    fun getActiveRole(): Flow<RoleType?> {
+    fun getActiveRole(userId: String): Flow<RoleType?> {
         return dataStore.data.map {
-            it[ACTIVE_ROLE]?.let(RoleType::from)
+            it[activeRoleKey(userId)]?.let(RoleType::from)
         }
+    }
+
+    private fun activeRoleKey(userId: String): Preferences.Key<String> {
+        return stringPreferencesKey("active_role_$userId")
     }
 }
