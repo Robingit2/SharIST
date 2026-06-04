@@ -300,7 +300,8 @@ private fun ProfileHeader(
             contentDescription = "Profile picture",
             modifier = Modifier
                 .size(112.dp)
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentScale = ContentScale.Crop,
             loadBytes = userRepository::downloadAvatar,
             placeholder = {
