@@ -2,12 +2,14 @@ package com.project.sharist.data.repository
 
 import android.content.Context
 import android.net.Uri
+import com.project.sharist.data.local.UserDao
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.model.user.User
 import com.project.sharist.data.model.user.UserRole
 import com.project.sharist.supabase
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.storage.storage
@@ -16,18 +18,37 @@ import io.ktor.http.ContentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-class UserRepository {
+class UserRepository(
+    private val userDao: UserDao? = null
+) {
     // TODO Remove GenericResult
     private val usersTable = supabase.postgrest["users"]
     private val userRolesTable = supabase.postgrest["user_roles"]
 
     suspend fun getUser(userId: String): GenericResult<User> {
         return safeSupabaseCall {
+            val shouldUseCache = userId == supabase.auth.currentUserOrNull()?.id
+            val cachedUser = if (shouldUseCache) userDao?.getUser(userId) else null
+            if (cachedUser != null) return@safeSupabaseCall cachedUser
+
             usersTable.select {
                 filter {
                     eq("id", userId)
                 }
             }.decodeSingle<User>()
+                .also { user -> if (shouldUseCache) cacheLoggedUser(user) }
+        }
+    }
+
+    suspend fun refreshUser(userId: String): GenericResult<User> {
+        return safeSupabaseCall {
+            val shouldUseCache = userId == supabase.auth.currentUserOrNull()?.id
+            usersTable.select {
+                filter {
+                    eq("id", userId)
+                }
+            }.decodeSingle<User>()
+                .also { user -> if (shouldUseCache) cacheLoggedUser(user) }
         }
     }
 
@@ -55,6 +76,17 @@ class UserRepository {
                 eq("id", userId)
             }
         }
+
+        refreshUser(userId)
+    }
+
+    suspend fun clearCachedUsers() {
+        userDao?.clearUsers()
+    }
+
+    private suspend fun cacheLoggedUser(user: User) {
+        userDao?.clearUsers()
+        userDao?.insertUser(user)
     }
 
     suspend fun uploadAvatar(context: Context, userId: String, uri: Uri): String {

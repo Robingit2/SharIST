@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
@@ -38,7 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
-import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.data.usecase.auth.LogoutUserUseCase
 import com.project.sharist.supabase
 import com.project.sharist.ui.navigation.Navigation.Screen
@@ -60,11 +61,12 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNav() {
+    val context = LocalContext.current
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val userRepository = remember { UserRepository() }
-    val logoutUserUseCase = remember { LogoutUserUseCase() }
+    val userRepository = remember(context) { cachedUserRepository(context) }
+    val logoutUserUseCase = remember(context) { LogoutUserUseCase(userRepository) }
 
     var userRoles by remember { mutableStateOf<List<RoleType>>(emptyList()) }
     var activeRole by remember { mutableStateOf<RoleType?>(null) }

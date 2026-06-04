@@ -62,23 +62,30 @@ import com.project.sharist.data.model.user.User
 import com.project.sharist.data.model.user.Vehicle
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.repository.VehicleRepository
+import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.ui.util.AuthenticatedImage
 import com.project.sharist.viewmodel.ProfileUiState
 import com.project.sharist.viewmodel.ProfileViewModel
+import com.project.sharist.viewmodel.ProfileViewModelFactory
 import java.util.Locale
 
 @Composable
 fun ProfileScreen(
     profileUserId: String? = null,
     currentUserId: String? = null,
-    viewModel: ProfileViewModel = viewModel(),
-    editProfileViewModel: EditProfileViewModel = viewModel(),
     onSettingsClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val userRepository = remember(context) { cachedUserRepository(context) }
+    val viewModel: ProfileViewModel = viewModel(
+        factory = ProfileViewModelFactory(userRepository)
+    )
+    val editProfileViewModel: EditProfileViewModel = viewModel(
+        factory = EditProfileViewModelFactory(userRepository)
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val editUiState by editProfileViewModel.uiState.collectAsState()
-    val context = LocalContext.current
     var showEditDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(profileUserId, currentUserId) {
