@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RecurringType
 import com.project.sharist.domain.model.RideOffer
 import java.text.SimpleDateFormat
@@ -46,9 +47,12 @@ import java.util.Locale
 @Composable
 fun AvailableRidesScreen(
     onDriverClick: (String) -> Unit,
-    viewModel: AvailableRidesViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val userRepository = remember(context) { cachedUserRepository(context) }
+    val viewModel: AvailableRidesViewModel = viewModel(
+        factory = AvailableRidesViewModelFactory(userRepository)
+    )
     val state by viewModel.uiState.collectAsState()
     val resultsListState = rememberLazyListState()
     val shouldLoadMore by remember {

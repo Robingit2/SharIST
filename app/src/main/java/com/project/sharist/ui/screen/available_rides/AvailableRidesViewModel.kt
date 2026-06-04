@@ -49,10 +49,11 @@ data class AvailableRidesUiState(
     val hasMoreResults: Boolean = false
 )
 
-class AvailableRidesViewModel : ViewModel() {
-    private val rideOfferRepository: RideOfferRepository = RideOfferRepository()
-    private val reservationRepository: ReservationRepository = ReservationRepository()
-    private val userRepository: UserRepository = UserRepository()
+class AvailableRidesViewModel(
+    private val rideOfferRepository: RideOfferRepository = RideOfferRepository(),
+    private val reservationRepository: ReservationRepository = ReservationRepository(),
+    private val userRepository: UserRepository
+) : ViewModel() {
     private val _uiState = MutableStateFlow(AvailableRidesUiState())
     val uiState: StateFlow<AvailableRidesUiState> = _uiState
     private var activeFilter: RideRequest? = null

@@ -32,7 +32,7 @@ data class MyRideOffersUiState(
 class MyRideOffersViewModel(
     private val repository: RideOfferRepository,
     private val reservationRepository: ReservationRepository = ReservationRepository(),
-    private val userRepository: UserRepository = UserRepository()
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MyRideOffersUiState())

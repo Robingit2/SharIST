@@ -29,7 +29,7 @@ data class ReservationsUiState(
 class ReservationsViewModel(
     private val reservationRepository: ReservationRepository = ReservationRepository(),
     private val rideOfferRepository: RideOfferRepository = RideOfferRepository(),
-    private val userRepository: UserRepository = UserRepository()
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReservationsUiState())

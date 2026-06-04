@@ -7,7 +7,7 @@ import com.project.sharist.supabase
 import io.github.jan.supabase.auth.auth
 
 class LogoutUserUseCase(
-    private val userRepository: UserRepository = UserRepository()
+    private val userRepository: UserRepository
 ) {
     suspend operator fun invoke(): GenericResult<Unit> {
         return safeSupabaseCall {

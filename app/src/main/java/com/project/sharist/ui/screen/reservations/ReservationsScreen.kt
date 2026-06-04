@@ -17,11 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RideOffer
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -29,9 +31,12 @@ import java.util.Locale
 @Composable
 fun ReservationsScreen(
     onDriverClick: (String) -> Unit,
-    viewModel: ReservationsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val userRepository = remember(context) { cachedUserRepository(context) }
+    val viewModel: ReservationsViewModel = viewModel(
+        factory = ReservationsViewModelFactory(userRepository)
+    )
     val state by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {

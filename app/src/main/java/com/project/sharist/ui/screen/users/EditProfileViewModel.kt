@@ -24,7 +24,7 @@ data class EditProfileUiState(
 )
 
 class EditProfileViewModel(
-    private val userRepository: UserRepository = UserRepository()
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditProfileUiState())

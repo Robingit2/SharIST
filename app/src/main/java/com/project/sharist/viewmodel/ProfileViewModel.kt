@@ -50,7 +50,7 @@ data class ProfileUiState(
 )
 
 class ProfileViewModel(
-    private val userRepository: UserRepository = UserRepository(),
+    private val userRepository: UserRepository,
     private val ratingsRepository: UserRatingRepository = UserRatingRepository(),
     private val commentsRepository: UserCommentRepository = UserCommentRepository(),
     private val vehicleRepository: VehicleRepository = VehicleRepository(),
