@@ -60,7 +60,7 @@ class ReservationsViewModel(
                     reservations = offers,
                     rideTitles = buildRideOfferTitles(context, offers),
                     driverNames = loadDriverNames(offers),
-                    reservationCounts = loadReservationCounts()
+                    reservationCounts = loadReservationCounts(offers)
                 )
             } catch (exception: Exception) {
                 _uiState.update {
@@ -83,10 +83,8 @@ class ReservationsViewModel(
             .toMap()
     }
 
-    private suspend fun loadReservationCounts(): Map<String, Int> {
-        return reservationRepository.getReservations()
-            .groupingBy { it.rideOfferId }
-            .eachCount()
+    private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
+        return reservationRepository.getReservationCountsByOffers(offers.map { it.id })
     }
 }
 

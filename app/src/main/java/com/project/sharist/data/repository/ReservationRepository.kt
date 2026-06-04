@@ -24,10 +24,6 @@ class ReservationRepository {
         }.decodeList()
     }
 
-    suspend fun getReservations(): List<ReservationEntity> {
-        return reservationsTable.select().decodeList()
-    }
-
     suspend fun getReservationsByOffers(offerIds: List<String>): List<ReservationEntity> {
         if (offerIds.isEmpty()) return emptyList()
 
@@ -36,5 +32,15 @@ class ReservationRepository {
                 isIn("ride_offer_id", offerIds)
             }
         }.decodeList()
+    }
+
+    suspend fun getReservationCountByOffer(offerId: String): Int {
+        return getReservationsByOffers(listOf(offerId)).size
+    }
+
+    suspend fun getReservationCountsByOffers(offerIds: List<String>): Map<String, Int> {
+        return getReservationsByOffers(offerIds)
+            .groupingBy { it.rideOfferId }
+            .eachCount()
     }
 }

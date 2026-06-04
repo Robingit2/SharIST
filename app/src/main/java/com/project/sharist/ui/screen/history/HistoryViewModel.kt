@@ -108,8 +108,7 @@ class HistoryViewModel(
     }
 
     private suspend fun loadPassengerIdsByOffer(offerIds: Set<String>): Map<String, List<String>> {
-        return reservationRepository.getReservations()
-            .filter { it.rideOfferId in offerIds }
+        return reservationRepository.getReservationsByOffers(offerIds.toList())
             .groupBy(
                 keySelector = { it.rideOfferId },
                 valueTransform = { it.passengerId }

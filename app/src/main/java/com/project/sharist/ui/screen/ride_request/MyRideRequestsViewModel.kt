@@ -68,8 +68,7 @@ class MyRideRequestsViewModel(
 
                 _uiState.value = MyRideRequestsUiState(
                     requests = requests,
-                    rideTitles = buildRideRequestTitles(context, requests),
-                    reservationCounts = loadReservationCounts()
+                    rideTitles = buildRideRequestTitles(context, requests)
                 )
             } catch (exception: Exception) {
                 _uiState.update {
@@ -119,7 +118,7 @@ class MyRideRequestsViewModel(
                     .filter { it.id in offerIds }
                 val offerTitles = buildRideOfferTitles(context, offers)
                 val driverNames = loadDriverNames(offers)
-                val reservationCounts = loadReservationCounts()
+                val reservationCounts = loadReservationCounts(offers)
 
                 _uiState.update {
                     it.copy(
@@ -160,8 +159,7 @@ class MyRideRequestsViewModel(
             try {
                 val offer = _uiState.value.matchedOffers[requestId]
                     ?.firstOrNull { it.id == offerId }
-                val currentReservationCount = reservationRepository.getReservations()
-                    .count { it.rideOfferId == offerId }
+                val currentReservationCount = reservationRepository.getReservationCountByOffer(offerId)
 
                 if (offer == null || currentReservationCount >= offer.vehicleCapacity) {
                     _uiState.update {
@@ -219,10 +217,8 @@ class MyRideRequestsViewModel(
             .toMap()
     }
 
-    private suspend fun loadReservationCounts(): Map<String, Int> {
-        return reservationRepository.getReservations()
-            .groupingBy { it.rideOfferId }
-            .eachCount()
+    private suspend fun loadReservationCounts(offers: List<RideOffer>): Map<String, Int> {
+        return reservationRepository.getReservationCountsByOffers(offers.map { it.id })
     }
 }
 

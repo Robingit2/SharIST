@@ -88,8 +88,7 @@ class AvailableRidesViewModel : ViewModel() {
 
             try {
                 val offer = uiState.value.results.firstOrNull { it.id == offerId }
-                val currentReservationCount = reservationRepository.getReservations()
-                    .count { it.rideOfferId == offerId }
+                val currentReservationCount = reservationRepository.getReservationCountByOffer(offerId)
 
                 if (offer == null || currentReservationCount >= offer.vehicleCapacity) {
                     _uiState.update {

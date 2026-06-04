@@ -12,18 +12,6 @@ class RideRequestRepository {
         rideRequestsTable.insert(request)
     }
 
-    suspend fun getRequests(): List<RideRequestEntity> {
-        return rideRequestsTable.select().decodeList()
-    }
-
-    suspend fun getRequestsByPassenger(passengerId: String): List<RideRequestEntity> {
-        return rideRequestsTable.select {
-            filter {
-                eq("passenger_id", passengerId)
-            }
-        }.decodeList()
-    }
-
     suspend fun getFutureRequestsByPassenger(passengerId: String, after: String): List<RideRequestEntity> {
         return rideRequestsTable.select {
             filter {
