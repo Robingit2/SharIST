@@ -394,3 +394,81 @@ private fun showDateTimePicker(
 private fun Long.formatDateTime(): String {
     return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(this)
 }
+
+
+
+
+@Composable
+fun PayPalPaymentDialog(
+    offer: RideOffer,
+    onDismiss: () -> Unit,
+    payPalController: PayPalController = viewModel()
+) {
+    val context = LocalContext.current
+    val payState by payPalController.paymentState.collectAsState()
+
+    // Auto-create the PayPal order the moment this screen opens
+    LaunchedEffect(Unit) {
+        payPalController.createPayPalOrder(offer.cost.toDouble())
+    }
+
+    //Automatically open the browser when the PayPal URL arrives
+    LaunchedEffect(payState.approvalUrl) {
+        if (!payState.approvalUrl.isNullOrEmpty() && !payState.hasReturned) {
+            val customTabsIntent = CustomTabsIntent.Builder().build()
+            customTabsIntent.launchUrl(context, Uri.parse(payState.approvalUrl))
+            payPalController.markReturned()
+            payPalController.consumeApprovalUrl()
+        }
+    }
+
+    //Close this screen automatically when payment is fully captured
+    LaunchedEffect(payState.isCompleted) {
+        if (payState.isCompleted) {
+            Toast.makeText(context, "Payment Successful!", Toast.LENGTH_SHORT).show()
+            payPalController.clearPaymentResult()
+            onDismiss()
+        }
+    }
+
+    LaunchedEffect(payState.error) {
+        payState.error?.let {
+            Toast.makeText(context, "Payment Failed: $it", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!payState.isProcessing) onDismiss() },
+        title = { Text("Secure Checkout") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text("Total Amount: $${offer.cost}", style = MaterialTheme.typography.titleLarge)
+
+                if (payState.isProcessing) {
+                    CircularProgressIndicator()
+                    Text("Processing transaction...")
+                } else if (payState.hasReturned && !payState.isCompleted) {
+                    Text("Did you authorize your payment in the browser tab?")
+                    Button(
+                        onClick = { payState.orderId?.let { payPalController.capturePayment(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Yes, I paid successfully")
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            if (!payState.isProcessing) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        }
+    )
+}
