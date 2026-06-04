@@ -12,16 +12,6 @@ class UserCommentRepository {
 
     private val userCommentsTable = supabase.postgrest["user_comments"]
 
-    suspend fun getCommentById(commentId: String) : GenericResult<UserComment?> {
-        return safeSupabaseCall {
-            userCommentsTable.select {
-                filter {
-                    eq("id", commentId)
-                }
-            }.decodeSingleOrNull<UserComment>()
-        }
-    }
-
     suspend fun getCommentByUsers(raterId: String, targetId: String) : GenericResult<UserComment?> {
         return safeSupabaseCall {
             userCommentsTable.select {
@@ -51,23 +41,6 @@ class UserCommentRepository {
         )
     }
 
-    suspend fun getCommentsPageByTargetResult(targetId: String, from: Long, to: Long): GenericResult<UserCommentsPage> {
-        return safeSupabaseCall {
-            getCommentsPageByTarget(targetId, from, to)
-        }
-    }
-
-    suspend fun getCommentsByRater(raterId: String) : GenericResult<List<UserComment>> {
-        return safeSupabaseCall {
-            userCommentsTable.select {
-                filter {
-                    eq("rater_user_id", raterId)
-                }
-            }.decodeList<UserComment>()
-
-        }
-    }
-
     suspend fun upsert(comment: UserComment) : GenericResult<Unit> {
         return safeSupabaseCall {
             userCommentsTable.upsert(comment)
@@ -94,5 +67,3 @@ data class UserCommentsPage(
     val comments: List<UserComment>,
     val totalCount: Int
 )
-
-private const val DEFAULT_PAGE_SIZE = 10L

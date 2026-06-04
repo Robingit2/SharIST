@@ -11,16 +11,7 @@ import kotlinx.serialization.Serializable
 class UserRatingRepository {
 
     private val userRatingsTable = supabase.postgrest["user_ratings"]
-
-    suspend fun getRatingById(ratingId: String) : GenericResult<UserRating?> {
-        return safeSupabaseCall {
-            userRatingsTable.select {
-                filter {
-                    eq("id", ratingId)
-                }
-            }.decodeSingleOrNull<UserRating>()
-        }
-    }
+    private val userRatingsView = supabase.postgrest["user_review_stats"]
 
     suspend fun getRatingByUsers(raterId: String, targetId: String) : GenericResult<UserRating?> {
         return safeSupabaseCall {
@@ -35,20 +26,9 @@ class UserRatingRepository {
         }
     }
 
-    suspend fun getRatingsByRater(raterId: String) : GenericResult<List<UserRating>> {
-        return safeSupabaseCall {
-            userRatingsTable.select {
-                filter {
-                    eq("rater_user_id", raterId)
-                }
-            }.decodeList<UserRating>()
-
-        }
-    }
-
     suspend fun getRatingStatsByTarget(targetId: String): GenericResult<UserRatingStats> {
         return safeSupabaseCall {
-            supabase.postgrest["user_review_stats"].select {
+            userRatingsView.select {
                 filter {
                     eq("user_id", targetId)
                 }
