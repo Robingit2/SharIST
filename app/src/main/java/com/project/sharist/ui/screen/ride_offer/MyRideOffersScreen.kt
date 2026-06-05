@@ -68,9 +68,11 @@ fun MyRideOffersScreen(
                     RideOfferItem(
                         offer = offer,
                         title = uiState.rideTitles[offer.id],
-                        freeSpots = (offer.vehicleCapacity - (uiState.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
+                        freeSpots = uiState.reservationCounts[offer.id]
+                            ?.let { reservationCount -> (offer.vehicleCapacity - reservationCount).coerceAtLeast(0) },
                         passengerIds = uiState.passengerIdsByOffer[offer.id].orEmpty(),
                         passengerNames = uiState.passengerNames,
+                        isPassengerDataUnavailable = offer.id in uiState.unavailablePassengerOfferIds,
                         isPendingSync = offer.id in uiState.pendingSyncOfferIds,
                         isSyncing = uiState.syncingOfferId == offer.id,
                         onPassengerClick = onPassengerClick,
@@ -106,9 +108,10 @@ fun MyRideOffersScreen(
 private fun RideOfferItem(
     offer: RideOffer,
     title: String?,
-    freeSpots: Int,
+    freeSpots: Int?,
     passengerIds: List<String>,
     passengerNames: Map<String, String>,
+    isPassengerDataUnavailable: Boolean,
     isPendingSync: Boolean,
     isSyncing: Boolean,
     onPassengerClick: (String) -> Unit,
@@ -130,7 +133,7 @@ private fun RideOfferItem(
             Text("Departure: ${offer.departureTimeMillis.formatDateTime()}")
             Text("Arrival: ${offer.estimatedArrivalTimeMillis.formatDateTime()}")
             Text("Cost: ${offer.cost}")
-            Text("Free spots: $freeSpots")
+            Text("Free spots: ${freeSpots?.toString() ?: "Unavailable"}")
             Text("Cancellation: ${offer.cancellationWindowMinutes} minutes")
             Text("Recurring: ${offer.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
             if (isPendingSync) {
@@ -139,7 +142,9 @@ private fun RideOfferItem(
 
             if (!isPendingSync) {
                 Text("Passengers", style = MaterialTheme.typography.titleSmall)
-                if (passengerIds.isEmpty()) {
+                if (isPassengerDataUnavailable) {
+                    Text("Passenger data unavailable.")
+                } else if (passengerIds.isEmpty()) {
                     Text("No passengers yet.")
                 } else {
                     passengerIds.forEach { passengerId ->

@@ -29,6 +29,7 @@ data class MyRideOffersUiState(
     val rideTitles: Map<String, String> = emptyMap(),
     val reservationCounts: Map<String, Int> = emptyMap(),
     val passengerIdsByOffer: Map<String, List<String>> = emptyMap(),
+    val unavailablePassengerOfferIds: Set<String> = emptySet(),
     val passengerNames: Map<String, String> = emptyMap(),
     val pendingSyncOfferIds: Set<String> = emptySet(),
     val syncingOfferId: String? = null,
@@ -45,6 +46,7 @@ class MyRideOffersViewModel(
     private val _uiState = MutableStateFlow(MyRideOffersUiState())
     val uiState: StateFlow<MyRideOffersUiState> = _uiState.asStateFlow()
     private var nextPage = 0
+    private var activeOffersAfter: String? = null
 
     fun loadOffers(context: Context) {
         val driverId = supabase.auth.currentUserOrNull()?.id
@@ -60,19 +62,21 @@ class MyRideOffersViewModel(
             val after = System.currentTimeMillis().toTimestampz()
             try {
                 nextPage = 0
+                activeOffersAfter = after
                 val pendingOffers = repository
                     .getPendingFutureOffersByDriver(driverId, after)
                     .map { it.toDomain() }
                 val syncedOffers = loadOffersPage(driverId, after, nextPage)
                 val offers = mergePendingAndSyncedOffers(pendingOffers, syncedOffers)
-                val passengerIdsByOffer = loadPassengerIdsByOffer(syncedOffers.map { it.id }.toSet())
+                val passengerResult = loadPassengerIdsByOfferOrUnavailable(syncedOffers.map { it.id }.toSet())
                 nextPage += 1
                 _uiState.value = MyRideOffersUiState(
                     offers = offers,
                     rideTitles = buildRideOfferTitles(context, offers),
-                    reservationCounts = passengerIdsByOffer.mapValues { it.value.size },
-                    passengerIdsByOffer = passengerIdsByOffer,
-                    passengerNames = loadPassengerNames(passengerIdsByOffer.values.flatten()),
+                    reservationCounts = passengerResult.passengerIdsByOffer.mapValues { it.value.size },
+                    passengerIdsByOffer = passengerResult.passengerIdsByOffer,
+                    unavailablePassengerOfferIds = passengerResult.unavailableOfferIds,
+                    passengerNames = loadPassengerNamesOrEmpty(passengerResult.passengerIdsByOffer.values.flatten()),
                     pendingSyncOfferIds = pendingOffers.map { it.id }.toSet(),
                     hasMoreOffers = syncedOffers.size == PAGE_SIZE
                 )
@@ -101,6 +105,7 @@ class MyRideOffersViewModel(
 
     fun loadMoreOffers(context: Context) {
         val driverId = supabase.auth.currentUserOrNull()?.id ?: return
+        val after = activeOffersAfter ?: return
         val state = _uiState.value
 
         if (state.isLoading || state.isLoadingMore || !state.hasMoreOffers) return
@@ -109,9 +114,9 @@ class MyRideOffersViewModel(
             _uiState.update { it.copy(isLoadingMore = true, errorMessage = null) }
 
             try {
-                val offers = loadOffersPage(driverId, System.currentTimeMillis().toTimestampz(), nextPage)
-                val passengerIdsByOffer = loadPassengerIdsByOffer(offers.map { it.id }.toSet())
-                val passengerNames = loadPassengerNames(passengerIdsByOffer.values.flatten())
+                val offers = loadOffersPage(driverId, after, nextPage)
+                val passengerResult = loadPassengerIdsByOfferOrUnavailable(offers.map { it.id }.toSet())
+                val passengerNames = loadPassengerNamesOrEmpty(passengerResult.passengerIdsByOffer.values.flatten())
                 nextPage += 1
 
                 _uiState.update {
@@ -119,8 +124,9 @@ class MyRideOffersViewModel(
                         isLoadingMore = false,
                         offers = it.offers + offers,
                         rideTitles = it.rideTitles + buildRideOfferTitles(context, offers),
-                        reservationCounts = it.reservationCounts + passengerIdsByOffer.mapValues { entry -> entry.value.size },
-                        passengerIdsByOffer = it.passengerIdsByOffer + passengerIdsByOffer,
+                        reservationCounts = it.reservationCounts + passengerResult.passengerIdsByOffer.mapValues { entry -> entry.value.size },
+                        passengerIdsByOffer = it.passengerIdsByOffer + passengerResult.passengerIdsByOffer,
+                        unavailablePassengerOfferIds = it.unavailablePassengerOfferIds + passengerResult.unavailableOfferIds,
                         passengerNames = it.passengerNames + passengerNames,
                         hasMoreOffers = offers.size == PAGE_SIZE
                     )
@@ -229,12 +235,26 @@ class MyRideOffersViewModel(
             )
     }
 
+    private suspend fun loadPassengerIdsByOfferOrUnavailable(offerIds: Set<String>): PassengerLoadResult {
+        return try {
+            PassengerLoadResult(
+                passengerIdsByOffer = loadPassengerIdsByOffer(offerIds),
+                unavailableOfferIds = emptySet()
+            )
+        } catch (_: Exception) {
+            PassengerLoadResult(
+                passengerIdsByOffer = emptyMap(),
+                unavailableOfferIds = offerIds
+            )
+        }
+    }
+
     private suspend fun loadOffersPage(driverId: String, after: String, page: Int): List<RideOffer> {
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
 
         return repository
-            .getFutureOffersByDriver(driverId, after, from, to)
+            .getMyFutureOffersByDriver(driverId, after, from, to)
             .getOrThrow("Could not load ride offers.")
             .map { it.toDomain() }
     }
@@ -256,7 +276,20 @@ class MyRideOffersViewModel(
             }
             .toMap()
     }
+
+    private suspend fun loadPassengerNamesOrEmpty(passengerIds: List<String>): Map<String, String> {
+        return try {
+            loadPassengerNames(passengerIds)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
 }
+
+private data class PassengerLoadResult(
+    val passengerIdsByOffer: Map<String, List<String>>,
+    val unavailableOfferIds: Set<String>
+)
 
 private const val PAGE_SIZE = 10
 

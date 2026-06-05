@@ -62,6 +62,21 @@ interface RideOfferDao {
 
     @Query("""
         SELECT * FROM ride_offers
+        WHERE driverId = :driverId
+            AND departureTime >= :after
+            AND pendingSync = 0
+        ORDER BY departureTime ASC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getCachedFutureOffersByDriver(
+        driverId: String,
+        after: String,
+        limit: Int,
+        offset: Int
+    ): List<RideOfferEntity>
+
+    @Query("""
+        SELECT * FROM ride_offers
         WHERE pendingSync = 1
             AND driverId = :driverId
             AND departureTime >= :after

@@ -63,7 +63,13 @@ class RideRequestRepository(
         from: Long,
         to: Long
     ): GenericResult<List<RideRequestEntity>> {
-        return safeSupabaseCall {
+        val cachedRequests = getCachedFutureRequestsByPassenger(passengerId, after, from, to)
+
+        if (cachedRequests.hasFullPage(from, to)) {
+            return GenericResult.Success(cachedRequests)
+        }
+
+        val result = safeSupabaseCall {
             rideRequestsTable.select {
                 filter {
                     eq("passenger_id", passengerId)
@@ -71,8 +77,29 @@ class RideRequestRepository(
                 }
                 order("departure_time", Order.ASCENDING)
                 range(from, to)
-            }.decodeList()
+            }.decodeList<RideRequestEntity>()
+                .also { requests -> cacheRequests(requests) }
         }
+
+        if (result is GenericResult.Error && result.error == AppError.Network && cachedRequests.isNotEmpty()) {
+            return GenericResult.Success(cachedRequests)
+        }
+
+        return result
+    }
+
+    private suspend fun getCachedFutureRequestsByPassenger(
+        passengerId: String,
+        after: String,
+        from: Long,
+        to: Long
+    ): List<RideRequestEntity> {
+        return rideRequestDao?.getCachedFutureRequestsByPassenger(
+            passengerId = passengerId,
+            after = after,
+            limit = (to - from + 1).toInt(),
+            offset = from.toInt()
+        ).orEmpty()
     }
 
     suspend fun delete(requestId: String): GenericResult<Unit> {
@@ -84,6 +111,15 @@ class RideRequestRepository(
             }
             rideRequestDao?.deleteById(requestId)
         }
+    }
+
+    private suspend fun cacheRequests(requests: List<RideRequestEntity>) {
+        if (requests.isEmpty()) return
+        rideRequestDao?.insertAll(requests.map { it.copy(pendingSync = false) })
+    }
+
+    private fun List<RideRequestEntity>.hasFullPage(from: Long, to: Long): Boolean {
+        return size == (to - from + 1).toInt()
     }
 }
 

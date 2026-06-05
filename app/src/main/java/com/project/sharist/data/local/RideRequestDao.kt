@@ -25,6 +25,21 @@ interface RideRequestDao {
     """)
     suspend fun getPendingFutureRequestsByPassenger(passengerId: String, after: String): List<RideRequestEntity>
 
+    @Query("""
+        SELECT * FROM ride_requests
+        WHERE pendingSync = 0
+            AND passengerId = :passengerId
+            AND desiredDepartureTime >= :after
+        ORDER BY desiredDepartureTime ASC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getCachedFutureRequestsByPassenger(
+        passengerId: String,
+        after: String,
+        limit: Int,
+        offset: Int
+    ): List<RideRequestEntity>
+
     @Query("SELECT * FROM ride_requests WHERE id = :requestId AND pendingSync = 1 LIMIT 1")
     suspend fun getPendingById(requestId: String): RideRequestEntity?
 
