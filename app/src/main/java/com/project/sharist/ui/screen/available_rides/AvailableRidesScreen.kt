@@ -3,7 +3,9 @@ package com.project.sharist.ui.screen.available_rides
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +44,7 @@ import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RecurringType
 import com.project.sharist.domain.model.RideOffer
+import com.project.sharist.ui.screen.payment.PayPalController
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
