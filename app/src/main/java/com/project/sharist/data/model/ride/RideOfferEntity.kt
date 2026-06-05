@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 @Entity(tableName = "ride_offers")
@@ -38,5 +39,10 @@ data class RideOfferEntity(
     val cancellationWindowMinutes: Int,
 
     @SerialName("recurrence_type")
-    val recurringType: String
+    val recurringType: String,
+
+    @Transient
+    val cacheLastAccessedAtMillis: Long = 0L,
+    @Transient
+    val cacheFetchedAtMillis: Long = 0L
 )

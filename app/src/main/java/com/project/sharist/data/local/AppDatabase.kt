@@ -12,7 +12,7 @@ import androidx.room.TypeConverters
         RideOfferEntity::class,
         RideRequestEntity::class
     ],
-    version = 1,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

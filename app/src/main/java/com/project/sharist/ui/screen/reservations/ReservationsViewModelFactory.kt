@@ -1,0 +1,22 @@
+package com.project.sharist.ui.screen.reservations
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.project.sharist.data.repository.RideOfferRepository
+import com.project.sharist.data.repository.UserRepository
+
+class ReservationsViewModelFactory(
+    private val rideOfferRepository: RideOfferRepository,
+    private val userRepository: UserRepository
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ReservationsViewModel::class.java)) {
+            return ReservationsViewModel(
+                rideOfferRepository = rideOfferRepository,
+                userRepository = userRepository
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}

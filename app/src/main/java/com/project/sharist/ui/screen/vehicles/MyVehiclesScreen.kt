@@ -1,8 +1,9 @@
 package com.project.sharist.ui.screen.vehicles
 
-import android.net.Uri
-import android.widget.ImageView
+import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +34,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.data.model.user.Vehicle
+import com.project.sharist.data.repository.VehicleRepository
+import com.project.sharist.ui.util.AuthenticatedImage
 
 @Composable
 fun MyVehiclesScreen(
@@ -71,10 +74,18 @@ fun MyVehiclesScreen(
 
             Button(
                 onClick = { showAddDialog = true },
-                enabled = !uiState.isLoading,
+                enabled = !uiState.isLoading && uiState.canAddVehicle,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Add vehicle")
+                Text(if (uiState.canAddVehicle) "Add vehicle" else "Vehicle limit reached")
+            }
+
+            if (!uiState.canAddVehicle) {
+                Text(
+                    text = "You can add up to $MAX_VEHICLES_PER_USER vehicles.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -106,7 +117,7 @@ fun MyVehiclesScreen(
         AddVehicleDialog(
             onDismiss = { showAddDialog = false },
             onAddClick = { plate, photoPath ->
-                viewModel.addVehicle(plate = plate, photoPath = photoPath)
+                viewModel.addVehicle(context = context, plate = plate, photoPath = photoPath)
                 showAddDialog = false
             }
         )
@@ -136,13 +147,6 @@ private fun VehicleItem(
                     text = vehicle.plate,
                     style = MaterialTheme.typography.titleMedium
                 )
-
-                if (!vehicle.photoPath.isNullOrBlank()) {
-                    Text(
-                        text = vehicle.photoPath,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
             }
 
             OutlinedButton(onClick = onDeleteClick) {
@@ -157,25 +161,21 @@ private fun VehiclePhoto(
     photoPath: String?,
     modifier: Modifier = Modifier
 ) {
-    if (photoPath.isNullOrBlank()) {
-        Box(
-            modifier = modifier,
-            contentAlignment = Alignment.Center
-        ) {
-            Text("No photo", style = MaterialTheme.typography.bodySmall)
-        }
-        return
-    }
+    val vehicleRepository = remember { VehicleRepository() }
 
-    AndroidView(
+    AuthenticatedImage(
+        path = photoPath,
+        contentDescription = "Vehicle photo",
         modifier = modifier,
-        factory = { context ->
-            ImageView(context).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
+        contentScale = ContentScale.Crop,
+        loadBytes = vehicleRepository::downloadVehiclePhoto,
+        placeholder = {
+            Box(
+                modifier = modifier,
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No photo", style = MaterialTheme.typography.bodySmall)
             }
-        },
-        update = { imageView ->
-            imageView.setImageURI(Uri.parse(photoPath))
         }
     )
 }
@@ -185,8 +185,20 @@ private fun AddVehicleDialog(
     onDismiss: () -> Unit,
     onAddClick: (plate: String, photoPath: String?) -> Unit
 ) {
+    val context = LocalContext.current
     var plate by remember { mutableStateOf("") }
     var photoPath by remember { mutableStateOf("") }
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            photoPath = uri.toString()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -202,12 +214,21 @@ private fun AddVehicleDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = photoPath,
-                    onValueChange = { photoPath = it },
-                    label = { Text("Photo path") },
+                OutlinedButton(
+                    onClick = { photoPicker.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Text(if (photoPath.isBlank()) "Choose photo" else "Change photo")
+                }
+
+                if (photoPath.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Photo selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         },
         confirmButton = {

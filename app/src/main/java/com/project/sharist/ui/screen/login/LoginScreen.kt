@@ -9,7 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.data.usecase.auth.LoginUserUseCase
 
 @Composable
@@ -18,8 +18,8 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
-    val loginUserUseCase = remember {
-        LoginUserUseCase(UserRepository())
+    val loginUserUseCase = remember(context) {
+        LoginUserUseCase(cachedUserRepository(context))
     }
     val viewModel: LoginViewModel = viewModel(
         factory = LoginViewModelFactory(loginUserUseCase)

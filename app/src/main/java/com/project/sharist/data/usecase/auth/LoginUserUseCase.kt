@@ -3,7 +3,6 @@ package com.project.sharist.data.usecase.auth
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.auth.LoginUserInput
 import com.project.sharist.data.model.error.AuthException
-import com.project.sharist.data.model.error.NotFoundException
 import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.user.User
 import com.project.sharist.data.repository.UserRepository
@@ -14,21 +13,18 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 class LoginUserUseCase(private val repository: UserRepository) {
 
     suspend operator fun invoke(data: LoginUserInput): GenericResult<User> {
-        return safeSupabaseCall {
+        val authResult = safeSupabaseCall {
             supabase.auth.signInWith(Email) {
                 email = data.email
                 password = data.password
             }
 
-            val authUser = supabase.auth.currentUserOrNull()
-                ?: throw AuthException()
+            supabase.auth.currentUserOrNull()?.id ?: throw AuthException()
+        }
 
-            val user = when (val result = repository.getUser(authUser.id)) {
-                is GenericResult.Success -> result.data
-                is GenericResult.Error -> throw NotFoundException()
-            }
-
-            user
+        return when (authResult) {
+            is GenericResult.Success -> repository.getUser(authResult.data)
+            is GenericResult.Error -> authResult
         }
     }
 }

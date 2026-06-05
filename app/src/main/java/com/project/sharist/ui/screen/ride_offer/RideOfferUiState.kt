@@ -14,7 +14,7 @@ data class RideOfferUiState(
     val cost: String = "",
     val vehicleCapacity: String = "",
     val cancellationWindowMinutes: String = "",
-    val recurringType: RecurringType = RecurringType.NONE,
+    val recurringType: RecurringType = RecurringType.ONCE,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val saved: Boolean = false

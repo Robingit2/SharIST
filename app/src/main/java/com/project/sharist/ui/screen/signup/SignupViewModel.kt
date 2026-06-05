@@ -1,5 +1,6 @@
 package com.project.sharist.ui.screen.signup
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
@@ -20,6 +21,7 @@ class SignupViewModel(private val registerUserUseCase: RegisterUserUseCase) : Vi
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     fun registerUser(
+        context: Context,
         state: SignupState,
         onSuccess: () -> Unit
     ) {
@@ -40,7 +42,7 @@ class SignupViewModel(private val registerUserUseCase: RegisterUserUseCase) : Vi
             _isLoading.value = true
             _errorMessage.value = null
 
-            when (val result = registerUserUseCase(user)) {
+            when (val result = registerUserUseCase(context, user)) {
                 is GenericResult.Success -> onSuccess()
                 is GenericResult.Error -> _errorMessage.value = result.error.toMessage("Could not create account.")
             }

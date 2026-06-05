@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 // TODO Separate supabase and room entities
 @Serializable
@@ -14,5 +15,9 @@ data class User (
     @SerialName("photo_path")
     val photoPath: String? = null,
     @SerialName("created_at")
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    @Transient
+    val cacheLastAccessedAtMillis: Long = 0L,
+    @Transient
+    val cacheFetchedAtMillis: Long = 0L
 )

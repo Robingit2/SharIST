@@ -22,21 +22,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.project.sharist.data.repository.RideOfferRepository
+import com.project.sharist.data.repository.cachedRideOfferRepository
+import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RideOffer
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @Composable
 fun MyRideOffersScreen(
+    onPassengerClick: (String) -> Unit,
     viewModel: MyRideOffersViewModel = myRideOffersViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.loadOffers()
+        viewModel.loadOffers(context)
     }
 
     Column(
@@ -59,8 +63,30 @@ fun MyRideOffersScreen(
                 items(uiState.offers, key = { it.id }) { offer ->
                     RideOfferItem(
                         offer = offer,
+                        title = uiState.rideTitles[offer.id],
+                        freeSpots = (offer.vehicleCapacity - (uiState.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
+                        passengerIds = uiState.passengerIdsByOffer[offer.id].orEmpty(),
+                        passengerNames = uiState.passengerNames,
+                        onPassengerClick = onPassengerClick,
                         onDeleteClick = { viewModel.deleteOffer(offer) }
                     )
+                }
+
+                if (uiState.hasMoreOffers) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (uiState.isLoadingMore) {
+                                Text("Loading more...")
+                            } else {
+                                OutlinedButton(onClick = { viewModel.loadMoreOffers(context) }) {
+                                    Text("Load more")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -70,6 +96,11 @@ fun MyRideOffersScreen(
 @Composable
 private fun RideOfferItem(
     offer: RideOffer,
+    title: String?,
+    freeSpots: Int,
+    passengerIds: List<String>,
+    passengerNames: Map<String, String>,
+    onPassengerClick: (String) -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -78,16 +109,27 @@ private fun RideOfferItem(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
+                text = title ?: "${offer.departure.latitude}, ${offer.departure.longitude} -> ${offer.arrival.latitude}, ${offer.arrival.longitude}",
                 style = MaterialTheme.typography.titleMedium
             )
 
             Text("Departure: ${offer.departureTimeMillis.formatDateTime()}")
             Text("Arrival: ${offer.estimatedArrivalTimeMillis.formatDateTime()}")
             Text("Cost: ${offer.cost}")
-            Text("Capacity: ${offer.vehicleCapacity}")
+            Text("Free spots: $freeSpots")
             Text("Cancellation: ${offer.cancellationWindowMinutes} minutes")
             Text("Recurring: ${offer.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
+
+            Text("Passengers", style = MaterialTheme.typography.titleSmall)
+            if (passengerIds.isEmpty()) {
+                Text("No passengers yet.")
+            } else {
+                passengerIds.forEach { passengerId ->
+                    OutlinedButton(onClick = { onPassengerClick(passengerId) }) {
+                        Text(passengerNames[passengerId] ?: passengerId)
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -103,12 +145,19 @@ private fun RideOfferItem(
 
 @Composable
 private fun myRideOffersViewModel(): MyRideOffersViewModel {
-    val repository = remember {
-        RideOfferRepository()
+    val context = LocalContext.current
+    val repository = remember(context) {
+        cachedRideOfferRepository(context)
+    }
+    val userRepository = remember(context) {
+        cachedUserRepository(context)
     }
 
     return viewModel(
-        factory = MyRideOffersViewModelFactory(repository)
+        factory = MyRideOffersViewModelFactory(
+            repository = repository,
+            userRepository = userRepository
+        )
     )
 }
 

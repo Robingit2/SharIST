@@ -1,5 +1,9 @@
 package com.project.sharist.ui.screen.users
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,10 +14,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
@@ -27,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +48,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,19 +59,31 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.data.model.review.UserComment
 import com.project.sharist.data.model.user.RoleType
 import com.project.sharist.data.model.user.User
+import com.project.sharist.data.model.user.Vehicle
+import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.data.repository.VehicleRepository
+import com.project.sharist.data.repository.cachedUserRepository
+import com.project.sharist.ui.util.AuthenticatedImage
 import com.project.sharist.viewmodel.ProfileUiState
 import com.project.sharist.viewmodel.ProfileViewModel
+import com.project.sharist.viewmodel.ProfileViewModelFactory
 import java.util.Locale
 
 @Composable
 fun ProfileScreen(
     profileUserId: String? = null,
     currentUserId: String? = null,
-    viewModel: ProfileViewModel = viewModel(),
-    editProfileViewModel: EditProfileViewModel = viewModel(),
     onSettingsClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val userRepository = remember(context) { cachedUserRepository(context) }
+    val viewModel: ProfileViewModel = viewModel(
+        factory = ProfileViewModelFactory(userRepository)
+    )
+    val editProfileViewModel: EditProfileViewModel = viewModel(
+        factory = EditProfileViewModelFactory(userRepository)
+    )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val editUiState by editProfileViewModel.uiState.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
@@ -103,7 +125,12 @@ fun ProfileScreen(
             }
         },
         onSettingsClick = onSettingsClick,
-        onLogoutClick = onLogoutClick
+        onLogoutClick = onLogoutClick,
+        onRatingChange = viewModel::updateRatingDraft,
+        onSaveRating = viewModel::submitRating,
+        onCommentChange = viewModel::updateCommentDraft,
+        onSaveComment = viewModel::submitComment,
+        onLoadMoreComments = viewModel::loadMoreComments
     )
 
     if (showEditDialog) {
@@ -111,7 +138,7 @@ fun ProfileScreen(
             uiState = editUiState,
             onNameChange = editProfileViewModel::onNameChange,
             onPhotoPathChange = editProfileViewModel::onPhotoPathChange,
-            onSave = editProfileViewModel::saveProfile,
+            onSave = { editProfileViewModel.saveProfile(context) },
             onDismiss = { showEditDialog = false }
         )
     }
@@ -122,7 +149,12 @@ private fun ProfileContent(
     uiState: ProfileUiState,
     onEditProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onRatingChange: (Int) -> Unit,
+    onSaveRating: () -> Unit,
+    onCommentChange: (String) -> Unit,
+    onSaveComment: () -> Unit,
+    onLoadMoreComments: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -149,7 +181,12 @@ private fun ProfileContent(
                 uiState = uiState,
                 onEditProfileClick = onEditProfileClick,
                 onSettingsClick = onSettingsClick,
-                onLogoutClick = onLogoutClick
+                onLogoutClick = onLogoutClick,
+                onRatingChange = onRatingChange,
+                onSaveRating = onSaveRating,
+                onCommentChange = onCommentChange,
+                onSaveComment = onSaveComment,
+                onLoadMoreComments = onLoadMoreComments
             )
         }
     }
@@ -160,7 +197,12 @@ private fun ProfileLoadedContent(
     uiState: ProfileUiState,
     onEditProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onRatingChange: (Int) -> Unit,
+    onSaveRating: () -> Unit,
+    onCommentChange: (String) -> Unit,
+    onSaveComment: () -> Unit,
+    onLoadMoreComments: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -168,7 +210,9 @@ private fun ProfileLoadedContent(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ProfileHeader(user = uiState.user!!)
+        ProfileHeader(
+            user = uiState.user!!
+        )
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -184,7 +228,14 @@ private fun ProfileLoadedContent(
         ProfileStats(
             averageRating = uiState.averageRating,
             ratingCount = uiState.ratingCount,
-            commentsCount = uiState.comments.size
+            commentsCount = uiState.commentsCount
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        RatingHistogram(
+            histogram = uiState.ratingHistogram,
+            totalRatings = uiState.ratingCount
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -196,7 +247,38 @@ private fun ProfileLoadedContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        CommentsSection(comments = uiState.comments)
+        if (RoleType.DRIVER in uiState.roles) {
+            VehiclesSection(
+                vehicles = uiState.vehicles
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (!uiState.isOwnProfile) {
+            ReviewActionsSection(
+                rating = uiState.ratingDraft,
+                comment = uiState.commentDraft,
+                isSavingRating = uiState.isSavingRating,
+                isSavingComment = uiState.isSavingComment,
+                ratingMessage = uiState.ratingMessage,
+                commentMessage = uiState.commentMessage,
+                onRatingChange = onRatingChange,
+                onSaveRating = onSaveRating,
+                onCommentChange = onCommentChange,
+                onSaveComment = onSaveComment
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        CommentsSection(
+            comments = uiState.comments,
+            authorNames = uiState.commentAuthorNames,
+            isLoadingMore = uiState.isLoadingMoreComments,
+            hasMoreComments = uiState.hasMoreComments,
+            onLoadMoreClick = onLoadMoreComments
+        )
 
         if (uiState.isOwnProfile) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -212,15 +294,34 @@ private fun ProfileLoadedContent(
 }
 
 @Composable
-private fun ProfileHeader(user: User) {
+private fun ProfileHeader(
+    user: User
+) {
+    val userRepository = remember { UserRepository() }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Default.AccountCircle,
+        AuthenticatedImage(
+            path = user.photoPath,
             contentDescription = "Profile picture",
-            modifier = Modifier.size(112.dp),
-            tint = MaterialTheme.colorScheme.primary
+            modifier = Modifier
+                .size(112.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentScale = ContentScale.Crop,
+            loadBytes = userRepository::downloadAvatar,
+            placeholder = {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Profile picture",
+                    modifier = Modifier
+                        .size(112.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -284,6 +385,19 @@ private fun EditProfileDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            onPhotoPathChange(uri.toString())
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit profile") },
@@ -299,13 +413,22 @@ private fun EditProfileDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = uiState.photoPath,
-                    onValueChange = onPhotoPathChange,
-                    label = { Text("Photo path") },
+                OutlinedButton(
+                    onClick = { photoPicker.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !uiState.isLoading
-                )
+                ) {
+                    Text(if (uiState.photoPath.isBlank()) "Choose photo" else "Change photo")
+                }
+
+                if (uiState.photoPath.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Photo selected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 if (uiState.errorMessage != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -468,7 +591,13 @@ private fun DetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun CommentsSection(comments: List<UserComment>) {
+private fun CommentsSection(
+    comments: List<UserComment>,
+    authorNames: Map<String, String>,
+    isLoadingMore: Boolean,
+    hasMoreComments: Boolean,
+    onLoadMoreClick: () -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -488,7 +617,25 @@ private fun CommentsSection(comments: List<UserComment>) {
                 )
             } else {
                 comments.forEach { comment ->
-                    CommentItem(comment = comment)
+                    CommentItem(
+                        comment = comment,
+                        authorName = authorNames[comment.raterUserId] ?: "Unknown user"
+                    )
+                }
+
+                if (hasMoreComments) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (isLoadingMore) {
+                            Text("Loading more...")
+                        } else {
+                            OutlinedButton(onClick = onLoadMoreClick) {
+                                Text("Load more")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -496,7 +643,10 @@ private fun CommentsSection(comments: List<UserComment>) {
 }
 
 @Composable
-private fun CommentItem(comment: UserComment) {
+private fun CommentItem(
+    comment: UserComment,
+    authorName: String
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
@@ -512,12 +662,352 @@ private fun CommentItem(comment: UserComment) {
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "By ${comment.raterUserId}" + (comment.createdAt?.let { " · $it" } ?: ""),
+                text = "By $authorName" + (comment.createdAt?.toShortDate()?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+@Composable
+private fun VehiclesSection(
+    vehicles: List<Vehicle>
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Vehicles",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (vehicles.isEmpty()) {
+                Text(
+                    text = "No vehicles added.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                vehicles.forEach { vehicle ->
+                    VehicleProfileItem(
+                        vehicle = vehicle
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleProfileItem(
+    vehicle: Vehicle
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            VehicleProfilePhoto(
+                photoPath = vehicle.photoPath,
+                modifier = Modifier.size(64.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = vehicle.plate,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = "Vehicle",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VehicleProfilePhoto(
+    photoPath: String?,
+    modifier: Modifier = Modifier
+) {
+    val vehicleRepository = remember { VehicleRepository() }
+
+    AuthenticatedImage(
+        path = photoPath,
+        contentDescription = "Vehicle photo",
+        modifier = modifier.clip(MaterialTheme.shapes.small),
+        contentScale = ContentScale.Crop,
+        loadBytes = vehicleRepository::downloadVehiclePhoto,
+        placeholder = {
+            Box(
+                modifier = modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No photo",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun RatingHistogram(
+    histogram: Map<Int, Int>,
+    totalRatings: Int
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Rating distribution",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            (5 downTo 1).forEach { rating ->
+                val count = histogram[rating] ?: 0
+                RatingHistogramRow(
+                    rating = rating,
+                    count = count,
+                    fraction = if (totalRatings == 0) 0f else count.toFloat() / totalRatings.toFloat()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingHistogramRow(
+    rating: Int,
+    count: Int,
+    fraction: Float
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.width(44.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = rating.toString(),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(10.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                    .height(10.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        Text(
+            text = count.toString(),
+            modifier = Modifier.width(28.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ReviewActionsSection(
+    rating: Int,
+    comment: String,
+    isSavingRating: Boolean,
+    isSavingComment: Boolean,
+    ratingMessage: String?,
+    commentMessage: String?,
+    onRatingChange: (Int) -> Unit,
+    onSaveRating: () -> Unit,
+    onCommentChange: (String) -> Unit,
+    onSaveComment: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        RatingInputCard(
+            rating = rating,
+            isSaving = isSavingRating,
+            message = ratingMessage,
+            onRatingChange = onRatingChange,
+            onSave = onSaveRating
+        )
+
+        CommentInputCard(
+            comment = comment,
+            isSaving = isSavingComment,
+            message = commentMessage,
+            onCommentChange = onCommentChange,
+            onSave = onSaveComment
+        )
+    }
+}
+
+@Composable
+private fun RatingInputCard(
+    rating: Int,
+    isSaving: Boolean,
+    message: String?,
+    onRatingChange: (Int) -> Unit,
+    onSave: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Add rating",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                (1..5).forEach { value ->
+                    IconButton(
+                        onClick = { onRatingChange(value) },
+                        enabled = !isSaving
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "$value star rating",
+                            modifier = Modifier.size(32.dp),
+                            tint = if (value <= rating) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Button(
+                    onClick = onSave,
+                    enabled = !isSaving
+                ) {
+                    Text(if (isSaving) "Saving..." else "Save rating")
+                }
+            }
+
+            ReviewMessage(message = message)
+        }
+    }
+}
+
+@Composable
+private fun CommentInputCard(
+    comment: String,
+    isSaving: Boolean,
+    message: String?,
+    onCommentChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Add comment",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            OutlinedTextField(
+                value = comment,
+                onValueChange = onCommentChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Comment") },
+                minLines = 3,
+                enabled = !isSaving
+            )
+
+            Button(
+                onClick = onSave,
+                enabled = !isSaving && comment.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (isSaving) "Saving..." else "Save comment")
+            }
+
+            ReviewMessage(message = message)
+        }
+    }
+}
+
+@Composable
+private fun ReviewMessage(message: String?) {
+    if (message != null) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun String.toShortDate(): String? {
+    val date = substringBefore("T")
+    val parts = date.split("-")
+    if (parts.size != 3) return null
+
+    val year = parts[0]
+    val month = parts[1].toIntOrNull()?.toString() ?: return null
+    val day = parts[2].toIntOrNull()?.toString() ?: return null
+
+    return "$day/$month/$year"
 }
 
 @Composable

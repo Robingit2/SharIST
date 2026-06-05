@@ -31,9 +31,10 @@ fun openPayPal(context: Context, url: String) {
 fun HomeScreen(
     role: RoleType,
     viewModel: HomeViewModel = viewModel(),
+    onCreateRideOfferClick: () -> Unit,
+    onCreateRideRequestClick: () -> Unit,
     weatherViewModel: WeatherViewModel = viewModel(),
     favoriteViewModel: FavoriteViewModel,
-    onCreateRideOfferClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = context as Activity
@@ -92,11 +93,15 @@ fun HomeScreen(
         }
 
         if (role == RoleType.PASSENGER) {
-            RideRequestScreen(
+            Button(
+                onClick = onCreateRideRequestClick,
                 Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
-            )
+                    .fillMaxWidth()
+            ) {
+                Text("Create ride request")
+            }
         }
 
         if (role == RoleType.DRIVER) {

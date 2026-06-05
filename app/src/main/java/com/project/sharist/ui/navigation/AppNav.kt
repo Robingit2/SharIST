@@ -28,26 +28,40 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavOptionsBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
-import com.project.sharist.data.repository.UserRepository
+import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.repository.cachedRideOfferRepository
+import com.project.sharist.data.repository.cachedUserRepository
+import com.project.sharist.data.repository.sessionRepository
 import com.project.sharist.data.usecase.auth.LogoutUserUseCase
+import com.project.sharist.data.usecase.user.GetActiveRoleUseCase
+import com.project.sharist.data.usecase.user.SetActiveRoleUseCase
 import com.project.sharist.supabase
 import com.project.sharist.ui.navigation.Navigation.Screen
+import com.project.sharist.ui.screen.available_rides.AvailableRidesScreen
+import com.project.sharist.ui.screen.history.HistoryScreen
 import com.project.sharist.ui.screen.home.HomeScreen
 import com.project.sharist.ui.screen.login.LoginScreen
+import com.project.sharist.ui.screen.reservations.ReservationsScreen
 import com.project.sharist.ui.screen.ride_offer.MyRideOffersScreen
 import com.project.sharist.ui.screen.ride_offer.RideOfferScreen
+import com.project.sharist.ui.screen.ride_request.MyRideRequestsScreen
+import com.project.sharist.ui.screen.ride_request.RideRequestScreen
 import com.project.sharist.ui.screen.signup.SignupScreen
 import com.project.sharist.ui.screen.users.ProfileScreen
 import com.project.sharist.ui.screen.vehicles.MyVehiclesScreen
 import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 import android.util.Log
@@ -65,11 +79,28 @@ import androidx.compose.material3.DropdownMenuItem
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNav() {
+    val context = LocalContext.current
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val userRepository = remember { UserRepository() }
-    val logoutUserUseCase = remember { LogoutUserUseCase() }
+    val userRepository = remember(context) { cachedUserRepository(context) }
+    val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
+    val sessionRepository = remember(context) { sessionRepository(context) }
+    val getActiveRoleUseCase = remember(sessionRepository) {
+        GetActiveRoleUseCase(sessionRepository)
+    }
+    val setActiveRoleUseCase = remember(userRepository, sessionRepository) {
+        SetActiveRoleUseCase(
+            userRepository = userRepository,
+            sessionRepository = sessionRepository
+        )
+    }
+    val logoutUserUseCase = remember(context) {
+        LogoutUserUseCase(
+            userRepository = userRepository,
+            rideOfferRepository = rideOfferRepository
+        )
+    }
 
     var userRoles by remember { mutableStateOf<List<RoleType>>(emptyList()) }
     var activeRole by remember { mutableStateOf<RoleType?>(null) }
@@ -87,11 +118,18 @@ fun AppNav() {
         if (!showDrawer) return@LaunchedEffect
 
         val currentUserId = supabase.auth.currentUserOrNull()?.id ?: return@LaunchedEffect
-        val roles = userRepository.getUserRoles(currentUserId)
+        val roles = userRepository.getUserRoles(currentUserId).getOrNull().orEmpty()
+        val savedRole = getActiveRoleUseCase(currentUserId).first()
+        val selectedRole = when {
+            savedRole in roles -> savedRole
+            activeRole in roles -> activeRole
+            else -> roles.firstOrNull()
+        }
 
         userRoles = roles
-        if (activeRole !in roles) {
-            activeRole = roles.firstOrNull()
+        activeRole = selectedRole
+        if (selectedRole != null && selectedRole != savedRole) {
+            setActiveRoleUseCase(currentUserId, selectedRole)
         }
     }
     LaunchedEffect(activeRole, supabase.auth.currentUserOrNull()?.id) {
@@ -153,19 +191,28 @@ fun AppNav() {
     if (showDrawer) {
         ModalNavigationDrawer(
             drawerState = drawerState,
-            gesturesEnabled = false,
+            gesturesEnabled = drawerState.isOpen,
             drawerContent = {
                 AppDrawerContent(
                     activeRole = activeRole,
                     userRoles = userRoles,
                     favorites = favorites,
                     //favoriteViewModel = favoriteViewModel,
+                    onHomeClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.Home.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onProfileClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.Profile.route)
                     },
                     onSettingsClick = { scope.launch { drawerState.close() } },
-                    onHistoryClick = { scope.launch { drawerState.close() } },
+                    onHistoryClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.History.route)
+                    },
                     onMyVehiclesClick = {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.MyVehicles.route)
@@ -174,13 +221,29 @@ fun AppNav() {
                         scope.launch { drawerState.close() }
                         navController.navigate(Screen.MyRideOffers.route)
                     },
-                    onReservationsClick = { scope.launch { drawerState.close() } },
-                    onAvailableRidesClick = { scope.launch { drawerState.close() } },
-                    onSwitchRoleClick = { role ->
-                        activeRole = role
+                    onReservationsClick = {
                         scope.launch { drawerState.close() }
-                        navController.navigate(Screen.Home.route) {
-                            launchSingleTop = true
+                        navController.navigate(Screen.Reservations.route)
+                    },
+                    onMyRequestsClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.MyRideRequests.route)
+                    },
+                    onAvailableRidesClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(Screen.AvailableRides.route)
+                    },
+                    onSwitchRoleClick = { role ->
+                        val currentUserId = supabase.auth.currentUserOrNull()?.id
+                        if (currentUserId != null) {
+                            scope.launch {
+                                setActiveRoleUseCase(currentUserId, role)
+                                activeRole = role
+                                drawerState.close()
+                                navController.navigate(Screen.Home.route) {
+                                    launchSingleTop = true
+                                }
+                            }
                         }
                     },
                     onFavoriteClick = { favorite ->
@@ -255,6 +318,9 @@ private fun AppNavHost(
                 favoriteViewModel = favoriteViewModel,
                 onCreateRideOfferClick = {
                     navController.navigate(Screen.RideOffer.route)
+                },
+                onCreateRideRequestClick = {
+                    navController.navigate(Screen.RideRequest.route)
                 }
             )
         }
@@ -266,8 +332,30 @@ private fun AppNavHost(
             )
         }
 
+        composable(
+            route = "${Screen.Profile.route}/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { entry ->
+            val userId = entry.arguments?.getString("userId")
+            ProfileScreen(
+                profileUserId = userId,
+                currentUserId = supabase.auth.currentUserOrNull()?.id,
+                onSettingsClick = { navController.popBackStack() },
+                onLogoutClick = onLogout
+            )
+        }
+
         composable(Screen.MyVehicles.route) {
             MyVehiclesScreen()
+        }
+
+        composable(Screen.History.route) {
+            HistoryScreen(
+                role = activeRole,
+                onUserClick = { userId ->
+                    navController.navigate("${Screen.Profile.route}/$userId")
+                }
+            )
         }
 
         composable(Screen.RideOffer.route) {
@@ -278,8 +366,44 @@ private fun AppNavHost(
             )
         }
 
+        composable(Screen.RideRequest.route) {
+            RideRequestScreen(
+                onRideRequestSaved = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
         composable(Screen.MyRideOffers.route) {
-            MyRideOffersScreen()
+            MyRideOffersScreen(
+                onPassengerClick = { passengerId ->
+                    navController.navigate("${Screen.Profile.route}/$passengerId")
+                }
+            )
+        }
+
+        composable(Screen.MyRideRequests.route) {
+            MyRideRequestsScreen(
+                onDriverClick = { driverId ->
+                    navController.navigate("${Screen.Profile.route}/$driverId")
+                }
+            )
+        }
+
+        composable(Screen.AvailableRides.route) {
+            AvailableRidesScreen(
+                onDriverClick = { driverId ->
+                    navController.navigate("${Screen.Profile.route}/$driverId")
+                }
+            )
+        }
+
+        composable(Screen.Reservations.route) {
+            ReservationsScreen(
+                onDriverClick = { driverId ->
+                    navController.navigate("${Screen.Profile.route}/$driverId")
+                }
+            )
         }
     }
 }
@@ -295,12 +419,14 @@ private fun NavOptionsBuilder.clearBackStack() {
 private fun AppDrawerContent(
     activeRole: RoleType?,
     userRoles: List<RoleType>,
+    onHomeClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onMyVehiclesClick: () -> Unit,
     onMyOffersClick: () -> Unit,
     onReservationsClick: () -> Unit,
+    onMyRequestsClick: () -> Unit,
     onAvailableRidesClick: () -> Unit,
     onSwitchRoleClick: (RoleType) -> Unit,
     favorites: List<FavoriteLocationEntity>,
@@ -318,6 +444,8 @@ private fun AppDrawerContent(
             modifier = Modifier.padding(16.dp),
             style = MaterialTheme.typography.titleLarge
         )
+
+        DrawerItem("Home", onHomeClick)
         Text("Favorites size: ${favorites.size}")
         DrawerItem("Profile", onProfileClick)
         DrawerItem("Settings", onSettingsClick)
@@ -410,6 +538,7 @@ private fun AppDrawerContent(
 
             RoleType.PASSENGER -> {
                 DrawerItem("Reservations", onReservationsClick)
+                DrawerItem("My ride requests", onMyRequestsClick)
                 DrawerItem("Available Rides", onAvailableRidesClick)
 
                 if (RoleType.DRIVER in userRoles) {

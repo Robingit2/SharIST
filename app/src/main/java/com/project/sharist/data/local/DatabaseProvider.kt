@@ -13,7 +13,9 @@ object DatabaseProvider {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "sharist_database"
-            ).build()
+            )
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .build()
 
             INSTANCE = instance
 

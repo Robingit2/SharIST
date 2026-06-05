@@ -8,6 +8,6 @@ class GetActiveRoleUseCase (
     private val sessionRepository: SessionRepository,
 ) {
     operator fun invoke(userId: String) : Flow<RoleType?> {
-        return sessionRepository.getActiveRole()
+        return sessionRepository.getActiveRole(userId)
     }
 }

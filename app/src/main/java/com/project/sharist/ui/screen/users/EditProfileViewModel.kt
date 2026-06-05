@@ -1,8 +1,11 @@
 package com.project.sharist.ui.screen.users
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.repository.UserProfileUpdate
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.supabase
@@ -22,7 +25,7 @@ data class EditProfileUiState(
 )
 
 class EditProfileViewModel(
-    private val userRepository: UserRepository = UserRepository()
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditProfileUiState())
@@ -74,7 +77,7 @@ class EditProfileViewModel(
         _uiState.update { it.copy(photoPath = photoPath, saved = false) }
     }
 
-    fun saveProfile() {
+    fun saveProfile(context: Context) {
         val userId = supabase.auth.currentUserOrNull()?.id
         val state = _uiState.value
 
@@ -92,14 +95,39 @@ class EditProfileViewModel(
             _uiState.update { it.copy(isLoading = true, errorMessage = null, saved = false) }
 
             try {
-                userRepository.updateProfile(
+                val photoPath = state.photoPath.trim()
+                val savedPhotoPath = if (photoPath.startsWith("content://")) {
+                    when (val result = userRepository.uploadAvatar(context, userId, Uri.parse(photoPath))) {
+                        is GenericResult.Success -> result.data
+                        is GenericResult.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    errorMessage = result.error.toMessage("Could not upload profile photo.")
+                                )
+                            }
+                            return@launch
+                        }
+                    }
+                } else {
+                    photoPath.takeIf { it.isNotEmpty() }
+                }
+
+                when (val result = userRepository.updateProfile(
                     userId = userId,
                     update = UserProfileUpdate(
                         name = state.name.trim(),
-                        photoPath = state.photoPath.trim().takeIf { it.isNotEmpty() }
+                        photoPath = savedPhotoPath
                     )
-                )
-                _uiState.update { it.copy(isLoading = false, saved = true) }
+                )) {
+                    is GenericResult.Success -> _uiState.update { it.copy(isLoading = false, saved = true) }
+                    is GenericResult.Error -> _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.error.toMessage("Could not save profile.")
+                        )
+                    }
+                }
             } catch (exception: Exception) {
                 _uiState.update {
                     it.copy(
