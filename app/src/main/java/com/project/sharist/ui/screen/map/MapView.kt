@@ -131,13 +131,7 @@ fun OpenStreetMapView(
 
     var selectedPoint by remember { mutableStateOf<GeoPoint?>(null) }
     var showDialog by remember { mutableStateOf(false) }
-    /*val favoriteMarker = remember {
-        Marker(mapView).apply {
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            title = "Favorite"
-            isDraggable = true
-        }
-    }*/
+
     val favoriteMarker = remember {
         Marker(mapView).apply {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
@@ -152,19 +146,6 @@ fun OpenStreetMapView(
             }
         }
     }
-
-    favoriteMarker.setOnMarkerDragListener(
-        object : Marker.OnMarkerDragListener {
-
-            override fun onMarkerDrag(marker: Marker?) {}
-            override fun onMarkerDragStart(marker: Marker?) {}
-            override fun onMarkerDragEnd(marker: Marker?) {
-                marker?.position?.let {
-                    selectedPoint = it
-                }
-            }
-        }
-    )
 
     val longPressOverlay = remember {
         MapEventsOverlay(
@@ -191,26 +172,7 @@ fun OpenStreetMapView(
             }
         )
     }
-    /*LaunchedEffect(selectedFavorite) {
-        selectedFavorite?.let { favorite ->
-            val lat = favorite.latitude ?: return@let
-            val lng = favorite.longitude ?: return@let
-            val point = GeoPoint(lat, lng)
 
-            // Center map
-            mapView.controller.setCenter(point)
-            mapView.controller.setZoom(18.0)
-
-            // Update favorite marker
-            favoriteMarker.position = point
-            favoriteMarker.title = favorite.name ?: "Favorite"
-            if (!mapView.overlays.contains(favoriteMarker)) {
-                mapView.overlays.add(favoriteMarker)
-            }
-
-            mapView.invalidate()
-        }
-    }*/
     LaunchedEffect(displayMode, favorites, selectedFavorite) {
         // Remove existing favorite markers only
         mapView.overlays.removeAll {
@@ -225,8 +187,6 @@ fun OpenStreetMapView(
 
             FavoriteDisplayMode.SINGLE -> {
                 selectedFavorite?.let { favorite ->
-                    val lat = favorite.latitude ?: return@let
-                    val lng = favorite.longitude ?: return@let
 
                     val marker = createFavoriteMarker(
                         mapView, favorite)
@@ -238,8 +198,6 @@ fun OpenStreetMapView(
 
             FavoriteDisplayMode.ALL -> {
                 favorites.forEach { favorite ->
-                    val lat = favorite.latitude ?: return@forEach
-                    val lng = favorite.longitude ?: return@forEach
 
                     val marker = createFavoriteMarker(
                         mapView, favorite)
@@ -371,10 +329,7 @@ fun OpenStreetMapView(
     }
 
     // ---------------- UI ----------------
-    /*AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { mapView }
-    )*/
+
     Box(modifier = Modifier.fillMaxSize()) {
 
         AndroidView(
