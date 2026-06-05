@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.mapper.toEntity
+import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.getOrNull
 import com.project.sharist.data.model.getOrThrow
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.repository.ReservationRepository
 import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.data.repository.UserRepository
@@ -27,6 +30,8 @@ data class MyRideOffersUiState(
     val reservationCounts: Map<String, Int> = emptyMap(),
     val passengerIdsByOffer: Map<String, List<String>> = emptyMap(),
     val passengerNames: Map<String, String> = emptyMap(),
+    val pendingSyncOfferIds: Set<String> = emptySet(),
+    val syncingOfferId: String? = null,
     val isLoadingMore: Boolean = false,
     val hasMoreOffers: Boolean = false
 )
@@ -52,10 +57,15 @@ class MyRideOffersViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
+            val after = System.currentTimeMillis().toTimestampz()
             try {
                 nextPage = 0
-                val offers = loadOffersPage(driverId, nextPage)
-                val passengerIdsByOffer = loadPassengerIdsByOffer(offers.map { it.id }.toSet())
+                val pendingOffers = repository
+                    .getPendingFutureOffersByDriver(driverId, after)
+                    .map { it.toDomain() }
+                val syncedOffers = loadOffersPage(driverId, after, nextPage)
+                val offers = mergePendingAndSyncedOffers(pendingOffers, syncedOffers)
+                val passengerIdsByOffer = loadPassengerIdsByOffer(syncedOffers.map { it.id }.toSet())
                 nextPage += 1
                 _uiState.value = MyRideOffersUiState(
                     offers = offers,
@@ -63,14 +73,27 @@ class MyRideOffersViewModel(
                     reservationCounts = passengerIdsByOffer.mapValues { it.value.size },
                     passengerIdsByOffer = passengerIdsByOffer,
                     passengerNames = loadPassengerNames(passengerIdsByOffer.values.flatten()),
-                    hasMoreOffers = offers.size == PAGE_SIZE
+                    pendingSyncOfferIds = pendingOffers.map { it.id }.toSet(),
+                    hasMoreOffers = syncedOffers.size == PAGE_SIZE
                 )
             } catch (exception: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = exception.message ?: "Could not load ride offers."
+                val pendingOffers = repository
+                    .getPendingFutureOffersByDriver(driverId, after)
+                    .map { it.toDomain() }
+
+                if (pendingOffers.isNotEmpty()) {
+                    _uiState.value = MyRideOffersUiState(
+                        offers = pendingOffers,
+                        rideTitles = buildRideOfferTitles(context, pendingOffers),
+                        pendingSyncOfferIds = pendingOffers.map { it.id }.toSet()
                     )
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = exception.message ?: "Could not load ride offers."
+                        )
+                    }
                 }
             }
         }
@@ -86,7 +109,7 @@ class MyRideOffersViewModel(
             _uiState.update { it.copy(isLoadingMore = true, errorMessage = null) }
 
             try {
-                val offers = loadOffersPage(driverId, nextPage)
+                val offers = loadOffersPage(driverId, System.currentTimeMillis().toTimestampz(), nextPage)
                 val passengerIdsByOffer = loadPassengerIdsByOffer(offers.map { it.id }.toSet())
                 val passengerNames = loadPassengerNames(passengerIdsByOffer.values.flatten())
                 nextPage += 1
@@ -140,6 +163,63 @@ class MyRideOffersViewModel(
         }
     }
 
+    fun syncPendingOffer(context: Context, offerId: String) {
+        val offer = _uiState.value.offers.firstOrNull { it.id == offerId } ?: return
+
+        if (offerId !in _uiState.value.pendingSyncOfferIds || _uiState.value.syncingOfferId != null) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    syncingOfferId = offerId,
+                    errorMessage = null
+                )
+            }
+
+            when (val result = repository.syncPendingOffer(offer.toEntity())) {
+                is GenericResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            syncingOfferId = null,
+                            pendingSyncOfferIds = it.pendingSyncOfferIds - offerId,
+                            rideTitles = it.rideTitles + buildRideOfferTitles(context, listOf(offer)),
+                            errorMessage = null
+                        )
+                    }
+                }
+
+                is GenericResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            syncingOfferId = null,
+                            errorMessage = result.error.toMessage("Could not send ride offer.")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun deletePendingOffer(offerId: String) {
+        if (offerId !in _uiState.value.pendingSyncOfferIds || _uiState.value.syncingOfferId == offerId) {
+            return
+        }
+
+        viewModelScope.launch {
+            repository.deletePendingOffer(offerId)
+            _uiState.update {
+                it.copy(
+                    offers = it.offers.filterNot { offer -> offer.id == offerId },
+                    rideTitles = it.rideTitles - offerId,
+                    pendingSyncOfferIds = it.pendingSyncOfferIds - offerId,
+                    errorMessage = null
+                )
+            }
+        }
+    }
+
     private suspend fun loadPassengerIdsByOffer(offerIds: Set<String>): Map<String, List<String>> {
         return reservationRepository.getReservationsByOffers(offerIds.toList())
             .getOrThrow("Could not load reservations.")
@@ -149,14 +229,23 @@ class MyRideOffersViewModel(
             )
     }
 
-    private suspend fun loadOffersPage(driverId: String, page: Int): List<RideOffer> {
+    private suspend fun loadOffersPage(driverId: String, after: String, page: Int): List<RideOffer> {
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
 
         return repository
-            .getFutureOffersByDriver(driverId, System.currentTimeMillis().toTimestampz(), from, to)
+            .getFutureOffersByDriver(driverId, after, from, to)
             .getOrThrow("Could not load ride offers.")
             .map { it.toDomain() }
+    }
+
+    private fun mergePendingAndSyncedOffers(
+        pendingOffers: List<RideOffer>,
+        syncedOffers: List<RideOffer>
+    ): List<RideOffer> {
+        val pendingIds = pendingOffers.map { it.id }.toSet()
+        return (pendingOffers + syncedOffers.filterNot { it.id in pendingIds })
+            .sortedBy { it.departureTimeMillis }
     }
 
     private suspend fun loadPassengerNames(passengerIds: List<String>): Map<String, String> {

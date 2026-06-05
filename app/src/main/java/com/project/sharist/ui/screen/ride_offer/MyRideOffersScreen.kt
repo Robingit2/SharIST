@@ -34,6 +34,7 @@ import java.util.Locale
 @Composable
 fun MyRideOffersScreen(
     onPassengerClick: (String) -> Unit,
+    onEditPendingOfferClick: (String) -> Unit,
     viewModel: MyRideOffersViewModel = myRideOffersViewModel()
 ) {
     val context = LocalContext.current
@@ -49,13 +50,16 @@ fun MyRideOffersScreen(
             .padding(24.dp),
     ) {
         Text("My ride offers", style = MaterialTheme.typography.headlineLarge)
+        if (uiState.errorMessage != null && uiState.offers.isNotEmpty()) {
+            Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         if (uiState.isLoading) {
             CircularProgressIndicator()
-        } else if (uiState.errorMessage != null) {
-            Text(uiState.errorMessage.orEmpty())
+        } else if (uiState.errorMessage != null && uiState.offers.isEmpty()) {
+            Text(uiState.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
         } else if (uiState.offers.isEmpty()) {
             Text("No ride offers created.")
         } else {
@@ -67,8 +71,13 @@ fun MyRideOffersScreen(
                         freeSpots = (offer.vehicleCapacity - (uiState.reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
                         passengerIds = uiState.passengerIdsByOffer[offer.id].orEmpty(),
                         passengerNames = uiState.passengerNames,
+                        isPendingSync = offer.id in uiState.pendingSyncOfferIds,
+                        isSyncing = uiState.syncingOfferId == offer.id,
                         onPassengerClick = onPassengerClick,
-                        onDeleteClick = { viewModel.deleteOffer(offer) }
+                        onDeleteClick = { viewModel.deleteOffer(offer) },
+                        onEditPendingClick = { onEditPendingOfferClick(offer.id) },
+                        onDeletePendingClick = { viewModel.deletePendingOffer(offer.id) },
+                        onSyncPendingClick = { viewModel.syncPendingOffer(context, offer.id) }
                     )
                 }
 
@@ -100,8 +109,13 @@ private fun RideOfferItem(
     freeSpots: Int,
     passengerIds: List<String>,
     passengerNames: Map<String, String>,
+    isPendingSync: Boolean,
+    isSyncing: Boolean,
     onPassengerClick: (String) -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onEditPendingClick: () -> Unit,
+    onDeletePendingClick: () -> Unit,
+    onSyncPendingClick: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -119,14 +133,19 @@ private fun RideOfferItem(
             Text("Free spots: $freeSpots")
             Text("Cancellation: ${offer.cancellationWindowMinutes} minutes")
             Text("Recurring: ${offer.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
+            if (isPendingSync) {
+                Text("Pending sync", color = MaterialTheme.colorScheme.primary)
+            }
 
-            Text("Passengers", style = MaterialTheme.typography.titleSmall)
-            if (passengerIds.isEmpty()) {
-                Text("No passengers yet.")
-            } else {
-                passengerIds.forEach { passengerId ->
-                    OutlinedButton(onClick = { onPassengerClick(passengerId) }) {
-                        Text(passengerNames[passengerId] ?: passengerId)
+            if (!isPendingSync) {
+                Text("Passengers", style = MaterialTheme.typography.titleSmall)
+                if (passengerIds.isEmpty()) {
+                    Text("No passengers yet.")
+                } else {
+                    passengerIds.forEach { passengerId ->
+                        OutlinedButton(onClick = { onPassengerClick(passengerId) }) {
+                            Text(passengerNames[passengerId] ?: passengerId)
+                        }
                     }
                 }
             }
@@ -135,8 +154,31 @@ private fun RideOfferItem(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                OutlinedButton(onClick = onDeleteClick) {
-                    Text("Delete")
+                if (isPendingSync) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = onEditPendingClick,
+                            enabled = !isSyncing
+                        ) {
+                            Text("Edit")
+                        }
+                        OutlinedButton(
+                            onClick = onDeletePendingClick,
+                            enabled = !isSyncing
+                        ) {
+                            Text("Delete")
+                        }
+                        OutlinedButton(
+                            onClick = onSyncPendingClick,
+                            enabled = !isSyncing
+                        ) {
+                            Text(if (isSyncing) "Sending..." else "Send")
+                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = onDeleteClick) {
+                        Text("Delete")
+                    }
                 }
             }
         }

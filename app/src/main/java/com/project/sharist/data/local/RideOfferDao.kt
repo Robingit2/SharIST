@@ -62,6 +62,21 @@ interface RideOfferDao {
 
     @Query("""
         SELECT * FROM ride_offers
+        WHERE pendingSync = 1
+            AND driverId = :driverId
+            AND departureTime >= :after
+        ORDER BY departureTime ASC
+    """)
+    suspend fun getPendingFutureOffersByDriver(driverId: String, after: String): List<RideOfferEntity>
+
+    @Query("SELECT * FROM ride_offers WHERE id = :offerId AND pendingSync = 1 LIMIT 1")
+    suspend fun getPendingById(offerId: String): RideOfferEntity?
+
+    @Query("UPDATE ride_offers SET pendingSync = 0, cacheFetchedAtMillis = :syncedAtMillis, cacheLastAccessedAtMillis = :syncedAtMillis WHERE id = :offerId")
+    suspend fun markSynced(offerId: String, syncedAtMillis: Long)
+
+    @Query("""
+        SELECT * FROM ride_offers
         WHERE driverId = :driverId
             AND departureTime < :before
             AND cacheFetchedAtMillis >= :minFetchedAtMillis
@@ -80,6 +95,7 @@ interface RideOfferDao {
         SELECT * FROM ride_offers
         WHERE driverId != :excludedDriverId
             AND recurringType = :recurringType
+            AND pendingSync = 0
             AND departureTime >= :now
             AND departureTime >= :departureStart
             AND departureTime <= :departureEnd

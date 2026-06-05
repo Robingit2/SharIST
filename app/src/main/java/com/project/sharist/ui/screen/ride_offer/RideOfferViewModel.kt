@@ -3,8 +3,12 @@ package com.project.sharist.ui.screen.ride_offer
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.mapper.toEntity
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.toMessage
+import com.project.sharist.data.repository.RideOfferInsertResult
+import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.data.usecase.ride.InsertRideOfferUseCase
 import com.project.sharist.domain.model.LatLng
 import com.project.sharist.domain.model.RecurringType
@@ -19,17 +23,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class RideOfferViewModel(
-    private val insertRideOfferUseCase: InsertRideOfferUseCase
+    private val insertRideOfferUseCase: InsertRideOfferUseCase,
+    private val rideOfferRepository: RideOfferRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow(RideOfferUiState())
     val state: StateFlow<RideOfferUiState> = _state
 
-    fun updateDepartureAddress(value: String) = _state.update { it.copy(departureAddress = value, saved = false) }
-    fun updateDepartureLat(value: String) = _state.update { it.copy(departureLat = value, saved = false) }
-    fun updateDepartureLng(value: String) = _state.update { it.copy(departureLng = value, saved = false) }
-    fun updateArrivalAddress(value: String) = _state.update { it.copy(arrivalAddress = value, saved = false) }
-    fun updateArrivalLat(value: String) = _state.update { it.copy(arrivalLat = value, saved = false) }
-    fun updateArrivalLng(value: String) = _state.update { it.copy(arrivalLng = value, saved = false) }
+    fun updateDepartureAddress(value: String) = _state.update { it.copy(departureAddress = value, saved = false, saveResult = null) }
+    fun updateDepartureLat(value: String) = _state.update { it.copy(departureLat = value, saved = false, saveResult = null) }
+    fun updateDepartureLng(value: String) = _state.update { it.copy(departureLng = value, saved = false, saveResult = null) }
+    fun updateArrivalAddress(value: String) = _state.update { it.copy(arrivalAddress = value, saved = false, saveResult = null) }
+    fun updateArrivalLat(value: String) = _state.update { it.copy(arrivalLat = value, saved = false, saveResult = null) }
+    fun updateArrivalLng(value: String) = _state.update { it.copy(arrivalLng = value, saved = false, saveResult = null) }
     fun updateDepartureTimeMillis(value: Long) {
         _state.update {
             it.copy(
@@ -37,15 +42,56 @@ class RideOfferViewModel(
                 estimatedArrivalTimeMillis = it.estimatedArrivalTimeMillis?.takeIf { arrival ->
                     arrival > value
                 },
-                saved = false
+                saved = false,
+                saveResult = null
             )
         }
     }
-    fun updateEstimatedArrivalTimeMillis(value: Long) = _state.update { it.copy(estimatedArrivalTimeMillis = value, saved = false) }
-    fun updateCost(value: String) = _state.update { it.copy(cost = value, saved = false) }
-    fun updateVehicleCapacity(value: String) = _state.update { it.copy(vehicleCapacity = value, saved = false) }
-    fun updateCancellationWindowMinutes(value: String) = _state.update { it.copy(cancellationWindowMinutes = value, saved = false) }
-    fun updateRecurringType(value: RecurringType) = _state.update { it.copy(recurringType = value, saved = false) }
+    fun updateEstimatedArrivalTimeMillis(value: Long) = _state.update { it.copy(estimatedArrivalTimeMillis = value, saved = false, saveResult = null) }
+    fun updateCost(value: String) = _state.update { it.copy(cost = value, saved = false, saveResult = null) }
+    fun updateVehicleCapacity(value: String) = _state.update { it.copy(vehicleCapacity = value, saved = false, saveResult = null) }
+    fun updateCancellationWindowMinutes(value: String) = _state.update { it.copy(cancellationWindowMinutes = value, saved = false, saveResult = null) }
+    fun updateRecurringType(value: RecurringType) = _state.update { it.copy(recurringType = value, saved = false, saveResult = null) }
+
+    fun loadPendingOffer(offerId: String) {
+        if (_state.value.editingPendingOfferId == offerId) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, errorMessage = null) }
+
+            val offer = rideOfferRepository.getPendingOffer(offerId)?.toDomain()
+
+            if (offer == null) {
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Pending ride offer was not found."
+                    )
+                }
+                return@launch
+            }
+
+            _state.update {
+                it.copy(
+                    editingPendingOfferId = offer.id,
+                    departureLat = offer.departure.latitude.toString(),
+                    departureLng = offer.departure.longitude.toString(),
+                    arrivalLat = offer.arrival.latitude.toString(),
+                    arrivalLng = offer.arrival.longitude.toString(),
+                    departureTimeMillis = offer.departureTimeMillis,
+                    estimatedArrivalTimeMillis = offer.estimatedArrivalTimeMillis,
+                    cost = offer.cost.toString(),
+                    vehicleCapacity = offer.vehicleCapacity.toString(),
+                    cancellationWindowMinutes = offer.cancellationWindowMinutes.toString(),
+                    recurringType = offer.recurringType,
+                    isLoading = false,
+                    errorMessage = null,
+                    saved = false,
+                    saveResult = null
+                )
+            }
+        }
+    }
 
     fun searchDepartureAddress(context: Context) {
         launchAddressSearch(
@@ -91,10 +137,28 @@ class RideOfferViewModel(
                 return@launch
             }
 
-            _state.update { it.copy(isLoading = true, errorMessage = null, saved = false) }
+            _state.update { it.copy(isLoading = true, errorMessage = null, saved = false, saveResult = null) }
+
+            if (state.value.editingPendingOfferId != null) {
+                rideOfferRepository.savePendingOffer(offer.toEntity())
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        saved = true,
+                        saveResult = RideOfferInsertResult.PendingSync
+                    )
+                }
+                return@launch
+            }
 
             when (val result = insertRideOfferUseCase(offer)) {
-                is GenericResult.Success -> _state.update { it.copy(isLoading = false, saved = true) }
+                is GenericResult.Success -> _state.update {
+                    it.copy(
+                        isLoading = false,
+                        saved = true,
+                        saveResult = result.data
+                    )
+                }
                 is GenericResult.Error -> _state.update {
                     it.copy(
                         isLoading = false,
@@ -147,7 +211,7 @@ class RideOfferViewModel(
         val validatedDriverId = driverId ?: return null
 
         return RideOffer(
-            id = UUID.randomUUID().toString(),
+            id = editingPendingOfferId ?: UUID.randomUUID().toString(),
             driverId = validatedDriverId,
             departure = LatLng(validatedDepartureLat, validatedDepartureLng),
             arrival = LatLng(validatedArrivalLat, validatedArrivalLng),

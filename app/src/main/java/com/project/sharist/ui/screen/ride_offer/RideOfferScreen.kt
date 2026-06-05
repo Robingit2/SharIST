@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.repository.RideOfferInsertResult
 import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.usecase.ride.InsertRideOfferUseCase
 import com.project.sharist.domain.model.RecurringType
@@ -39,6 +40,7 @@ import java.util.Locale
 @Composable
 fun RideOfferScreen(
     onRideOfferSaved: () -> Unit,
+    pendingOfferId: String? = null,
     viewModel: RideOfferViewModel = rideOfferViewModel()
 ) {
     val context = LocalContext.current
@@ -50,9 +52,24 @@ fun RideOfferScreen(
         }
     }
 
+    LaunchedEffect(pendingOfferId) {
+        pendingOfferId?.let(viewModel::loadPendingOffer)
+    }
+
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            Toast.makeText(context, "Ride offer created.", Toast.LENGTH_SHORT).show()
+            val message = when (state.saveResult) {
+                RideOfferInsertResult.PendingSync -> {
+                    if (state.editingPendingOfferId != null) {
+                        "Ride offer changes saved."
+                    } else {
+                        "Ride offer saved offline."
+                    }
+                }
+                RideOfferInsertResult.Synced,
+                null -> "Ride offer created."
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             onRideOfferSaved()
         }
     }
@@ -64,7 +81,10 @@ fun RideOfferScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Create ride offer", style = MaterialTheme.typography.headlineLarge)
+        Text(
+            if (pendingOfferId == null) "Create ride offer" else "Edit ride offer",
+            style = MaterialTheme.typography.headlineLarge
+        )
 
         AddressSection(
             title = "Departure",
@@ -158,7 +178,7 @@ fun RideOfferScreen(
             if (state.isLoading) {
                 CircularProgressIndicator()
             } else {
-                Text("Publish ride")
+                Text(if (pendingOfferId == null) "Publish ride" else "Save changes")
             }
         }
     }
@@ -314,13 +334,14 @@ private fun Long.formatDateTime(): String {
 @Composable
 private fun rideOfferViewModel(): RideOfferViewModel {
     val context = LocalContext.current
+    val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
     val insertRideOfferUseCase = remember(context) {
         InsertRideOfferUseCase(
-            cachedRideOfferRepository(context)
+            rideOfferRepository
         )
     }
 
     return viewModel(
-        factory = RideOfferViewModelFactory(insertRideOfferUseCase)
+        factory = RideOfferViewModelFactory(insertRideOfferUseCase, rideOfferRepository)
     )
 }

@@ -44,5 +44,7 @@ data class RideOfferEntity(
     @Transient
     val cacheLastAccessedAtMillis: Long = 0L,
     @Transient
-    val cacheFetchedAtMillis: Long = 0L
+    val cacheFetchedAtMillis: Long = 0L,
+    @Transient
+    val pendingSync: Boolean = false
 )

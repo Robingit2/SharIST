@@ -358,8 +358,16 @@ private fun AppNavHost(
             )
         }
 
-        composable(Screen.RideOffer.route) {
+        composable(
+            route = "${Screen.RideOffer.route}?pendingOfferId={pendingOfferId}",
+            arguments = listOf(navArgument("pendingOfferId") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            })
+        ) { entry ->
             RideOfferScreen(
+                pendingOfferId = entry.arguments?.getString("pendingOfferId"),
                 onRideOfferSaved = {
                     navController.popBackStack()
                 }
@@ -386,6 +394,9 @@ private fun AppNavHost(
             MyRideOffersScreen(
                 onPassengerClick = { passengerId ->
                     navController.navigate("${Screen.Profile.route}/$passengerId")
+                },
+                onEditPendingOfferClick = { offerId ->
+                    navController.navigate("${Screen.RideOffer.route}?pendingOfferId=$offerId")
                 }
             )
         }

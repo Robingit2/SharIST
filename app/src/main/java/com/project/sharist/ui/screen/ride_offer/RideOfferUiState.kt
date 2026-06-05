@@ -1,8 +1,10 @@
 package com.project.sharist.ui.screen.ride_offer
 
 import com.project.sharist.domain.model.RecurringType
+import com.project.sharist.data.repository.RideOfferInsertResult
 
 data class RideOfferUiState(
+    val editingPendingOfferId: String? = null,
     val departureAddress: String = "",
     val departureLat: String = "",
     val departureLng: String = "",
@@ -17,5 +19,6 @@ data class RideOfferUiState(
     val recurringType: RecurringType = RecurringType.ONCE,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    val saveResult: RideOfferInsertResult? = null
 )

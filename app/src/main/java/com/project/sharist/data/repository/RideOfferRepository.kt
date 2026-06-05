@@ -3,6 +3,7 @@ package com.project.sharist.data.repository
 import com.project.sharist.data.local.RideOfferDao
 import com.project.sharist.data.mapper.toEntity
 import com.project.sharist.data.model.GenericResult
+import com.project.sharist.data.model.error.AppError
 import com.project.sharist.data.model.helpers.safeSupabaseCall
 import com.project.sharist.data.model.ride.RideOfferEntity
 import com.project.sharist.domain.model.RideRequest
@@ -18,11 +19,48 @@ class RideOfferRepository(
 
     private val rideOffersTable = supabase.postgrest["ride_offers"]
 
-    suspend fun insert(offer: RideOfferEntity): GenericResult<Unit> {
-        return safeSupabaseCall {
-            rideOffersTable.insert(offer)
-            cacheOffers(listOf(offer))
+    suspend fun insert(offer: RideOfferEntity): GenericResult<RideOfferInsertResult> {
+        val result = safeSupabaseCall {
+            rideOffersTable.insert(offer.copy(pendingSync = false))
+            cacheOffers(listOf(offer.copy(pendingSync = false)))
+            RideOfferInsertResult.Synced
         }
+
+        if (result is GenericResult.Error && result.error == AppError.Network) {
+            savePendingOffer(offer)
+            return GenericResult.Success(RideOfferInsertResult.PendingSync)
+        }
+
+        return result
+    }
+
+    suspend fun syncPendingOffer(offer: RideOfferEntity): GenericResult<Unit> {
+        return safeSupabaseCall {
+            rideOffersTable.insert(offer.copy(pendingSync = false))
+            rideOfferDao?.markSynced(offer.id, System.currentTimeMillis())
+        }
+    }
+
+    suspend fun getPendingFutureOffersByDriver(driverId: String, after: String): List<RideOfferEntity> {
+        return rideOfferDao?.getPendingFutureOffersByDriver(driverId, after).orEmpty()
+    }
+
+    suspend fun getPendingOffer(offerId: String): RideOfferEntity? {
+        return rideOfferDao?.getPendingById(offerId)
+    }
+
+    suspend fun savePendingOffer(offer: RideOfferEntity) {
+        rideOfferDao?.insert(
+            offer.copy(
+                pendingSync = true,
+                cacheFetchedAtMillis = 0L,
+                cacheLastAccessedAtMillis = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun deletePendingOffer(offerId: String) {
+        rideOfferDao?.deleteById(offerId)
     }
 
     suspend fun getFutureOffers(after: String): GenericResult<List<RideOfferEntity>> {
@@ -297,7 +335,8 @@ class RideOfferRepository(
             offers.map { offer ->
                 offer.copy(
                     cacheLastAccessedAtMillis = now,
-                    cacheFetchedAtMillis = now
+                    cacheFetchedAtMillis = now,
+                    pendingSync = false
                 )
             }
         )
@@ -315,6 +354,11 @@ class RideOfferRepository(
     private fun minFreshFetchedAtMillis(): Long {
         return System.currentTimeMillis() - RIDE_OFFER_CACHE_TTL_MILLIS
     }
+}
+
+enum class RideOfferInsertResult {
+    Synced,
+    PendingSync
 }
 
 private data class CoordinateBounds(
