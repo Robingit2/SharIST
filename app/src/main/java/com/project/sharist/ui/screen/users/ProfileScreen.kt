@@ -63,6 +63,7 @@ import com.project.sharist.data.model.user.Vehicle
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.repository.VehicleRepository
 import com.project.sharist.data.repository.cachedUserRepository
+import com.project.sharist.data.repository.sessionRepository
 import com.project.sharist.ui.util.AuthenticatedImage
 import com.project.sharist.viewmodel.ProfileUiState
 import com.project.sharist.viewmodel.ProfileViewModel
@@ -78,8 +79,9 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val userRepository = remember(context) { cachedUserRepository(context) }
+    val sessionRepository = remember(context) { sessionRepository(context) }
     val viewModel: ProfileViewModel = viewModel(
-        factory = ProfileViewModelFactory(userRepository)
+        factory = ProfileViewModelFactory(userRepository, sessionRepository)
     )
     val editProfileViewModel: EditProfileViewModel = viewModel(
         factory = EditProfileViewModelFactory(userRepository)
@@ -216,6 +218,11 @@ private fun ProfileLoadedContent(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        if (uiState.isReducedOfflineProfile) {
+            ReducedOfflineProfileNotice()
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         if (uiState.isOwnProfile) {
             ProfileActions(
                 onEditProfileClick = onEditProfileClick,
@@ -225,20 +232,22 @@ private fun ProfileLoadedContent(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        ProfileStats(
-            averageRating = uiState.averageRating,
-            ratingCount = uiState.ratingCount,
-            commentsCount = uiState.commentsCount
-        )
+        if (!uiState.isReducedOfflineProfile) {
+            ProfileStats(
+                averageRating = uiState.averageRating,
+                ratingCount = uiState.ratingCount,
+                commentsCount = uiState.commentsCount
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        RatingHistogram(
-            histogram = uiState.ratingHistogram,
-            totalRatings = uiState.ratingCount
-        )
+            RatingHistogram(
+                histogram = uiState.ratingHistogram,
+                totalRatings = uiState.ratingCount
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         ProfileDetails(
             user = uiState.user,
@@ -247,7 +256,7 @@ private fun ProfileLoadedContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (RoleType.DRIVER in uiState.roles) {
+        if (RoleType.DRIVER in uiState.roles && !uiState.isReducedOfflineProfile) {
             VehiclesSection(
                 vehicles = uiState.vehicles
             )
@@ -272,13 +281,15 @@ private fun ProfileLoadedContent(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        CommentsSection(
-            comments = uiState.comments,
-            authorNames = uiState.commentAuthorNames,
-            isLoadingMore = uiState.isLoadingMoreComments,
-            hasMoreComments = uiState.hasMoreComments,
-            onLoadMoreClick = onLoadMoreComments
-        )
+        if (!uiState.isReducedOfflineProfile) {
+            CommentsSection(
+                comments = uiState.comments,
+                authorNames = uiState.commentAuthorNames,
+                isLoadingMore = uiState.isLoadingMoreComments,
+                hasMoreComments = uiState.hasMoreComments,
+                onLoadMoreClick = onLoadMoreComments
+            )
+        }
 
         if (uiState.isOwnProfile) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -290,6 +301,18 @@ private fun ProfileLoadedContent(
                 Text("Logout")
             }
         }
+    }
+}
+
+@Composable
+private fun ReducedOfflineProfileNotice() {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Offline profile. Showing cached name and roles only.",
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

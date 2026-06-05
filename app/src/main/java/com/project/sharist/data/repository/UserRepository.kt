@@ -52,6 +52,12 @@ class UserRepository(
         }
     }
 
+    suspend fun getCachedUser(userId: String): User? {
+        return userDao?.getUser(userId)?.also {
+            userDao.updateLastAccessed(userId, System.currentTimeMillis())
+        }
+    }
+
     suspend fun getUserRoles(userId: String): GenericResult<List<RoleType>> {
         return safeSupabaseCall {
             val roleRows = userRolesTable.select(Columns.raw("roles (name)")) {

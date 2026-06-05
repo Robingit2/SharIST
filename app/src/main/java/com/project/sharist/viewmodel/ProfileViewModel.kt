@@ -16,6 +16,7 @@ import com.project.sharist.data.repository.UserRatingRepository
 import com.project.sharist.data.repository.UserRatingStats
 import com.project.sharist.data.repository.UserRepository
 import com.project.sharist.data.repository.VehicleRepository
+import com.project.sharist.data.repository.SessionRepository
 import com.project.sharist.data.usecase.review.GiveOrUpdateCommentUseCase
 import com.project.sharist.data.usecase.review.GiveOrUpdateRatingUseCase
 import com.project.sharist.supabase
@@ -23,6 +24,7 @@ import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -47,12 +49,14 @@ data class ProfileUiState(
     val isSavingComment: Boolean = false,
     val isLoadingMoreComments: Boolean = false,
     val hasMoreComments: Boolean = false,
+    val isReducedOfflineProfile: Boolean = false,
     val ratingMessage: String? = null,
     val commentMessage: String? = null
 )
 
 class ProfileViewModel(
     private val userRepository: UserRepository,
+    private val sessionRepository: SessionRepository,
     private val ratingsRepository: UserRatingRepository = UserRatingRepository(),
     private val commentsRepository: UserCommentRepository = UserCommentRepository(),
     private val vehicleRepository: VehicleRepository = VehicleRepository(),
@@ -119,6 +123,10 @@ class ProfileViewModel(
                     commentDraft = ownComment?.comment.orEmpty()
                 )
             } catch (exception: Exception) {
+                if (userId == currentUserId && loadCachedCurrentUserProfile(userId)) {
+                    return@launch
+                }
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -127,6 +135,21 @@ class ProfileViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun loadCachedCurrentUserProfile(userId: String): Boolean {
+        val cachedUser = userRepository.getCachedUser(userId) ?: return false
+        val cachedRoles = sessionRepository.getUserRoles(userId).first()
+
+        _uiState.value = ProfileUiState(
+            user = cachedUser,
+            roles = cachedRoles,
+            isOwnProfile = true,
+            profileUserId = userId,
+            currentUserId = userId,
+            isReducedOfflineProfile = true
+        )
+        return true
     }
 
     fun updateRatingDraft(value: Int) {
