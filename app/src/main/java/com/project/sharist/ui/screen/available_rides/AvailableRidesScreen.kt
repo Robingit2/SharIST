@@ -2,10 +2,16 @@ package com.project.sharist.ui.screen.available_rides
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -424,7 +431,10 @@ fun PayPalPaymentDialog(
     payPalController: PayPalController = viewModel()
 ) {
     val context = LocalContext.current
+    val activity = context.findActivity()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val payState by payPalController.paymentState.collectAsState()
+    var completionHandled by remember(offer.id) { mutableStateOf(false) }
 
     // Auto-create the PayPal order the moment this screen opens
     LaunchedEffect(Unit) {
@@ -441,12 +451,35 @@ fun PayPalPaymentDialog(
         }
     }
 
+    DisposableEffect(lifecycleOwner, payState.orderId) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+
+            val data = activity?.intent?.data ?: return@LifecycleEventObserver
+            if (data.scheme != "myapp" || data.host != "paypal-success") return@LifecycleEventObserver
+
+            val returnedOrderId = data.getQueryParameter("token") ?: payState.orderId
+            activity.setIntent(Intent(activity.intent).setData(null))
+
+            if (!returnedOrderId.isNullOrBlank() && !payState.isCompleted) {
+                payPalController.markReturned()
+                payPalController.capturePayment(returnedOrderId)
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     //Close this screen automatically when payment is fully captured
     LaunchedEffect(payState.isCompleted) {
-        if (payState.isCompleted) {
+        if (payState.isCompleted && !completionHandled) {
+            completionHandled = true
             Toast.makeText(context, "Payment Successful!", Toast.LENGTH_SHORT).show()
-            payPalController.clearPaymentResult()
             onPaymentCompleted()
+            payPalController.clearPaymentResult()
         }
     }
 
@@ -490,4 +523,12 @@ fun PayPalPaymentDialog(
             }
         }
     )
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
 }

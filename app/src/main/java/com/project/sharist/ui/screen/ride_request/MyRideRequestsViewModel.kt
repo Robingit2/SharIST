@@ -128,6 +128,13 @@ class MyRideRequestsViewModel(
     }
 
     fun toggleMatches(context: Context, requestId: String) {
+        val passengerId = supabase.auth.currentUserOrNull()?.id
+
+        if (passengerId == null) {
+            _uiState.update { it.copy(matchErrorMessage = "No logged in user found.") }
+            return
+        }
+
         if (_uiState.value.expandedRequestId == requestId) {
             _uiState.update { it.copy(expandedRequestId = null, matchErrorMessage = null) }
             return
@@ -155,7 +162,7 @@ class MyRideRequestsViewModel(
 
             try {
                 nextMatchPageByRequest[requestId] = 0
-                val matchPage = loadMatchesPage(requestId, nextMatchPageByRequest.getValue(requestId))
+                val matchPage = loadMatchesPage(requestId, passengerId, nextMatchPageByRequest.getValue(requestId))
                 nextMatchPageByRequest[requestId] = nextMatchPageByRequest.getValue(requestId) + 1
                 val offers = matchPage.offers
                 val offerTitles = buildRideOfferTitles(context, offers)
@@ -184,6 +191,12 @@ class MyRideRequestsViewModel(
     }
 
     fun loadMoreMatches(context: Context, requestId: String) {
+        val passengerId = supabase.auth.currentUserOrNull()?.id
+        if (passengerId == null) {
+            _uiState.update { it.copy(matchErrorMessage = "No logged in user found.") }
+            return
+        }
+
         val state = _uiState.value
 
         if (
@@ -204,7 +217,7 @@ class MyRideRequestsViewModel(
 
             try {
                 val page = nextMatchPageByRequest[requestId] ?: 0
-                val matchPage = loadMatchesPage(requestId, page)
+                val matchPage = loadMatchesPage(requestId, passengerId, page)
                 nextMatchPageByRequest[requestId] = page + 1
                 val offers = matchPage.offers
                 val offerTitles = buildRideOfferTitles(context, offers)
@@ -276,7 +289,8 @@ class MyRideRequestsViewModel(
                                 expandedRequestId = null,
                                 requests = it.requests.filterNot { request -> request.id == requestId },
                                 rideTitles = it.rideTitles - requestId,
-                                matchedOffers = it.matchedOffers - requestId,
+                                matchedOffers = (it.matchedOffers - requestId)
+                                    .mapValues { (_, offers) -> offers.filterNot { offer -> offer.id == offerId } },
                                 hasMoreMatchesByRequest = it.hasMoreMatchesByRequest - requestId,
                                 reservationCounts = it.reservationCounts + (offerId to currentReservationCount + 1),
                                 matchErrorMessage = null
@@ -330,7 +344,7 @@ class MyRideRequestsViewModel(
             .map { it.toDomain() }
     }
 
-    private suspend fun loadMatchesPage(requestId: String, page: Int): MatchPage {
+    private suspend fun loadMatchesPage(requestId: String, passengerId: String, page: Int): MatchPage {
         val from = page * PAGE_SIZE.toLong()
         val to = from + PAGE_SIZE - 1
         val matches = rideMatchRepository
@@ -341,11 +355,21 @@ class MyRideRequestsViewModel(
             .getFutureOffersByIds(offerIds, System.currentTimeMillis().toTimestampz())
             .getOrThrow("Could not load matched offers.")
             .map { it.toDomain() }
+        val bookedOfferIds = loadBookedOfferIds(passengerId, offerIds)
 
         return MatchPage(
-            offers = offers,
+            offers = offers.filterNot { it.id in bookedOfferIds },
             hasMore = matches.size == PAGE_SIZE
         )
+    }
+
+    private suspend fun loadBookedOfferIds(passengerId: String, offerIds: List<String>): Set<String> {
+        return reservationRepository
+            .getReservationsByOffers(offerIds)
+            .getOrThrow("Could not load reservations.")
+            .filter { it.passengerId == passengerId }
+            .map { it.rideOfferId }
+            .toSet()
     }
 }
 
