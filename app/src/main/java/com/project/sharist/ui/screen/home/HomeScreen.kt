@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 import com.project.sharist.data.model.user.RoleType
+import com.project.sharist.ui.screen.favorite.FavoriteDisplayMode
 import com.project.sharist.ui.screen.map.OpenStreetMapView
 import com.project.sharist.ui.screen.weather.WeatherViewModel
 
@@ -26,6 +27,8 @@ fun HomeScreen(
     favoriteViewModel: FavoriteViewModel,
 ) {
     var centerOnUserLocationTrigger by remember { mutableIntStateOf(0) }
+    val favoriteDisplayMode by favoriteViewModel.displayMode.collectAsState()
+    val showFavoriteMarkers = favoriteDisplayMode == FavoriteDisplayMode.ALL
 
     Box(Modifier.fillMaxSize()) {
 
@@ -45,6 +48,27 @@ fun HomeScreen(
                 imageVector = Icons.Default.LocationOn,
                 contentDescription = "Center map on my location"
             )
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            tonalElevation = 3.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Favorites")
+                Switch(
+                    checked = showFavoriteMarkers,
+                    onCheckedChange = favoriteViewModel::setShowAllFavorites
+                )
+            }
         }
 
         if (role == RoleType.PASSENGER) {

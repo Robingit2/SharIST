@@ -23,7 +23,7 @@ class FavoriteViewModel : ViewModel() {
     val favorites = _favorites.asStateFlow()
     private val _selectedLocation = MutableStateFlow<FavoriteLocationEntity?>(null)
     val selectedLocation = _selectedLocation.asStateFlow()
-    private val _displayMode = MutableStateFlow(FavoriteDisplayMode.NONE)
+    private val _displayMode = MutableStateFlow(FavoriteDisplayMode.ALL)
     val displayMode: StateFlow<FavoriteDisplayMode> = _displayMode
 
 
@@ -68,6 +68,10 @@ class FavoriteViewModel : ViewModel() {
     }
     fun showAllFavorites() {
         _displayMode.value = FavoriteDisplayMode.ALL
+    }
+
+    fun setShowAllFavorites(show: Boolean) {
+        _displayMode.value = if (show) FavoriteDisplayMode.ALL else FavoriteDisplayMode.NONE
     }
 
     fun clearFavoritesFromMap() {

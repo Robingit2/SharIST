@@ -246,7 +246,6 @@ fun OpenStreetMapView(
                         mapView, favorite)
 
                     mapView.overlays.add(marker)
-                    mapView.controller.setCenter(marker.position)
                 }
             }
         }
