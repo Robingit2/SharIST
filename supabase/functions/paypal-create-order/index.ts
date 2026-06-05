@@ -4,13 +4,23 @@
 
 // Setup type definitions for built-in Supabase Runtime APIs
 import "@supabase/functions-js/edge-runtime.d.ts";
-import { withSupabase } from "@supabase/server";
 
 import { serve } from "https://deno.land/std/http/server.ts";
 
 serve(async (req) => {
   const PAYPAL_CLIENT_ID = Deno.env.get("PAYPAL_CLIENT_ID");
   const PAYPAL_CLIENT_SECRET = Deno.env.get("PAYPAL_CLIENT_SECRET");
+  const { amount } = await req.json().catch(() => ({ amount: null }));
+  const parsedAmount = Number(amount);
+
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    return new Response(JSON.stringify({ error: "Invalid amount" }), {
+      headers: { "Content-Type": "application/json" },
+      status: 400,
+    });
+  }
+
+  const paypalAmount = parsedAmount.toFixed(2);
 
   // 1. Get PayPal Access Token
   const auth = await fetch("https://api-m.sandbox.paypal.com/v1/oauth2/token", {
@@ -38,7 +48,7 @@ serve(async (req) => {
         {
           amount: {
             currency_code: "USD",
-            value: "100.00",
+            value: paypalAmount,
           },
         },
       ],
@@ -47,13 +57,13 @@ serve(async (req) => {
         cancel_url: "myapp://paypal-cancel",
         landing_page: "LOGIN",
         user_action: "PAY_NOW",
-        shipping_preference: "NO_SHIPPING"
-      }
+        shipping_preference: "NO_SHIPPING",
+      },
     }),
   });
 
   const orderData = await order.json();
-  console.log("TEST",JSON.stringify(orderData, null, 2));
+  console.log("TEST", JSON.stringify(orderData, null, 2));
   return new Response(JSON.stringify(orderData), {
     headers: { "Content-Type": "application/json" },
     status: 200,
