@@ -54,7 +54,8 @@ import android.graphics.drawable.GradientDrawable
 @Composable
 fun OpenStreetMapView(
     weatherViewModel: WeatherViewModel,
-    favoriteViewModel: FavoriteViewModel
+    favoriteViewModel: FavoriteViewModel,
+    centerOnUserLocationTrigger: Int = 0
 ) {
     val context = LocalContext.current
     val weatherState by weatherViewModel.state.collectAsState()
@@ -343,6 +344,31 @@ fun OpenStreetMapView(
         mapView.controller.setCenter(currentPoint)
         marker.position = currentPoint
         mapView.invalidate()
+    }
+
+    LaunchedEffect(centerOnUserLocationTrigger) {
+        if (centerOnUserLocationTrigger == 0) return@LaunchedEffect
+
+        if (!hasPermission) {
+            permissionState.launchPermissionRequest()
+            return@LaunchedEffect
+        }
+
+        try {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                val point = location?.let {
+                    GeoPoint(it.latitude, it.longitude)
+                } ?: currentPoint
+
+                currentPoint = point
+                marker.position = point
+                mapView.controller.setZoom(18.0)
+                mapView.controller.animateTo(point)
+                mapView.invalidate()
+            }
+        } catch (e: SecurityException) {
+            Log.e("MAP_DEBUG", "Permission missing", e)
+        }
     }
 
     // ---------------- ADD MARKER ONCE ----------------
