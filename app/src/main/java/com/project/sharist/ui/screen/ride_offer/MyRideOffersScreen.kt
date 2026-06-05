@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.data.repository.cachedReservationRepository
 import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RideOffer
@@ -196,6 +197,9 @@ private fun myRideOffersViewModel(): MyRideOffersViewModel {
     val repository = remember(context) {
         cachedRideOfferRepository(context)
     }
+    val reservationRepository = remember(context) {
+        cachedReservationRepository(context)
+    }
     val userRepository = remember(context) {
         cachedUserRepository(context)
     }
@@ -203,6 +207,7 @@ private fun myRideOffersViewModel(): MyRideOffersViewModel {
     return viewModel(
         factory = MyRideOffersViewModelFactory(
             repository = repository,
+            reservationRepository = reservationRepository,
             userRepository = userRepository
         )
     )

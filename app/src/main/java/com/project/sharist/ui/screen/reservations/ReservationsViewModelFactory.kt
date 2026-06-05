@@ -2,10 +2,12 @@ package com.project.sharist.ui.screen.reservations
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.project.sharist.data.repository.ReservationRepository
 import com.project.sharist.data.repository.RideOfferRepository
 import com.project.sharist.data.repository.UserRepository
 
 class ReservationsViewModelFactory(
+    private val reservationRepository: ReservationRepository,
     private val rideOfferRepository: RideOfferRepository,
     private val userRepository: UserRepository
 ) : ViewModelProvider.Factory {
@@ -13,6 +15,7 @@ class ReservationsViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ReservationsViewModel::class.java)) {
             return ReservationsViewModel(
+                reservationRepository = reservationRepository,
                 rideOfferRepository = rideOfferRepository,
                 userRepository = userRepository
             ) as T

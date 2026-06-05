@@ -24,6 +24,12 @@ fun cachedRideRequestRepository(context: Context): RideRequestRepository {
     )
 }
 
+fun cachedReservationRepository(context: Context): ReservationRepository {
+    return ReservationRepository(
+        reservationDao = DatabaseProvider.getDatabase(context).reservationDao()
+    )
+}
+
 fun sessionRepository(context: Context): SessionRepository {
     return SessionRepository(context.applicationContext.sessionDataStore)
 }
