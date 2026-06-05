@@ -52,8 +52,8 @@ fun HomeScreen(
 
         Surface(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 88.dp),
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
             tonalElevation = 3.dp

@@ -9,6 +9,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,9 +38,13 @@ import io.github.jan.supabase.auth.auth
 
 
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.MapEventsOverlay
 import com.project.sharist.ui.screen.favorite.FavoriteViewModel
@@ -49,6 +56,8 @@ import org.osmdroid.views.overlay.infowindow.InfoWindow
 import android.widget.TextView
 import android.widget.FrameLayout
 import android.graphics.drawable.GradientDrawable
+import com.project.sharist.ui.util.findAddressCoordinates
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -59,6 +68,7 @@ fun OpenStreetMapView(
 ) {
     val context = LocalContext.current
     val weatherState by weatherViewModel.state.collectAsState()
+    val scope = rememberCoroutineScope()
     // ---------------- PERMISSION ----------------
     val permissionState = rememberPermissionState(
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -150,6 +160,55 @@ fun OpenStreetMapView(
             newIcon?.let {
                 DrawableCompat.setTint(it, android.graphics.Color.RED)
                 icon = it
+            }
+        }
+    }
+
+    val searchMarker = remember {
+        Marker(mapView).apply {
+            id = "address_search_result"
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            title = "Search result"
+            icon?.let {
+                val drawable = it.constantState?.newDrawable()?.mutate()
+                drawable?.setTint(android.graphics.Color.MAGENTA)
+                icon = drawable
+            }
+        }
+    }
+
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchingAddress by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+
+    fun searchAddress() {
+        val query = searchQuery.trim()
+        if (query.isBlank() || isSearchingAddress) return
+
+        scope.launch {
+            isSearchingAddress = true
+            searchError = null
+
+            try {
+                val location = findAddressCoordinates(context, query)
+                if (location == null) {
+                    searchError = "Address not found."
+                    return@launch
+                }
+
+                val point = GeoPoint(location.latitude, location.longitude)
+                searchMarker.position = point
+                searchMarker.title = query
+                if (!mapView.overlays.contains(searchMarker)) {
+                    mapView.overlays.add(searchMarker)
+                }
+                mapView.controller.setZoom(18.0)
+                mapView.controller.animateTo(point)
+                mapView.invalidate()
+            } catch (exception: Exception) {
+                searchError = exception.message ?: "Could not search address."
+            } finally {
+                isSearchingAddress = false
             }
         }
     }
@@ -406,6 +465,52 @@ fun OpenStreetMapView(
             modifier = Modifier.fillMaxSize(),
             factory = { mapView }
         )
+
+        Card(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 12.dp, end = 12.dp, bottom = 148.dp)
+                .fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = {
+                        searchQuery = it
+                        searchError = null
+                    },
+                    label = { Text("Search address") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSearchingAddress
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = ::searchAddress,
+                    enabled = !isSearchingAddress && searchQuery.isNotBlank()
+                ) {
+                    if (isSearchingAddress) {
+                        CircularProgressIndicator()
+                    } else {
+                        Text("Go")
+                    }
+                }
+            }
+
+            searchError?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
 
         Box(
             modifier = Modifier
