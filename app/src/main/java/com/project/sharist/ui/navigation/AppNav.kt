@@ -39,7 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.project.sharist.data.model.user.RoleType
-import com.project.sharist.data.model.getOrNull
+import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.data.repository.sessionRepository
@@ -118,8 +118,34 @@ fun AppNav() {
         if (!showDrawer) return@LaunchedEffect
 
         val currentUserId = supabase.auth.currentUserOrNull()?.id ?: return@LaunchedEffect
-        val roles = userRepository.getUserRoles(currentUserId).getOrNull().orEmpty()
+        val cachedRoles = sessionRepository.getUserRoles(currentUserId).first()
         val savedRole = getActiveRoleUseCase(currentUserId).first()
+
+        if (cachedRoles.isNotEmpty()) {
+            val cachedSelectedRole = when {
+                savedRole in cachedRoles -> savedRole
+                activeRole in cachedRoles -> activeRole
+                else -> cachedRoles.firstOrNull()
+            }
+
+            userRoles = cachedRoles
+            activeRole = cachedSelectedRole
+        }
+
+        val roles = if (cachedRoles.isNotEmpty()) {
+            cachedRoles
+        } else {
+            when (val result = userRepository.getUserRoles(currentUserId)) {
+                is GenericResult.Success -> {
+                    sessionRepository.setUserRoles(currentUserId, result.data)
+                    result.data
+                }
+                is GenericResult.Error -> emptyList()
+            }
+        }
+
+        if (roles.isEmpty()) return@LaunchedEffect
+
         val selectedRole = when {
             savedRole in roles -> savedRole
             activeRole in roles -> activeRole
@@ -129,7 +155,7 @@ fun AppNav() {
         userRoles = roles
         activeRole = selectedRole
         if (selectedRole != null && selectedRole != savedRole) {
-            setActiveRoleUseCase(currentUserId, selectedRole)
+            sessionRepository.setActiveRole(currentUserId, selectedRole)
         }
     }
     LaunchedEffect(activeRole, supabase.auth.currentUserOrNull()?.id) {
