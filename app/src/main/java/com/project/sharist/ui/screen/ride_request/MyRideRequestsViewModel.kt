@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.getOrNull
 import com.project.sharist.data.model.getOrThrow
+import com.project.sharist.data.model.toMessage
 import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.mapper.toEntity
 import com.project.sharist.data.model.error.AppError
 import com.project.sharist.data.model.ride.ReservationEntity
 import com.project.sharist.data.repository.ReservationRepository
@@ -40,6 +42,8 @@ data class MyRideRequestsUiState(
     val matchedOfferTitles: Map<String, String> = emptyMap(),
     val driverNames: Map<String, String> = emptyMap(),
     val reservationCounts: Map<String, Int> = emptyMap(),
+    val pendingSyncRequestIds: Set<String> = emptySet(),
+    val syncingRequestId: String? = null,
     val isLoadingMoreRequests: Boolean = false,
     val hasMoreRequests: Boolean = false,
     val hasMoreMatchesByRequest: Map<String, Boolean> = emptyMap()
@@ -70,25 +74,44 @@ class MyRideRequestsViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
+            val after = System.currentTimeMillis().toTimestampz()
+            activeRequestsAfter = after
+            nextRequestPage = 0
+            nextMatchPageByRequest.clear()
+
             try {
-                val after = System.currentTimeMillis().toTimestampz()
-                activeRequestsAfter = after
-                nextRequestPage = 0
-                nextMatchPageByRequest.clear()
-                val requests = loadRequestsPage(passengerId, after, nextRequestPage)
+                val pendingRequests = repository
+                    .getPendingFutureRequestsByPassenger(passengerId, after)
+                    .map { it.toDomain() }
+                val syncedRequests = loadRequestsPage(passengerId, after, nextRequestPage)
+                val requests = mergePendingAndSyncedRequests(pendingRequests, syncedRequests)
                 nextRequestPage += 1
 
                 _uiState.value = MyRideRequestsUiState(
                     requests = requests,
                     rideTitles = buildRideRequestTitles(context, requests),
-                    hasMoreRequests = requests.size == PAGE_SIZE
+                    pendingSyncRequestIds = pendingRequests.map { it.id }.toSet(),
+                    hasMoreRequests = syncedRequests.size == PAGE_SIZE
                 )
             } catch (exception: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = exception.message ?: "Could not load ride requests."
+                val pendingRequests = repository
+                    .getPendingFutureRequestsByPassenger(passengerId, after)
+                    .map { it.toDomain() }
+
+                if (pendingRequests.isNotEmpty()) {
+                    _uiState.value = MyRideRequestsUiState(
+                        requests = pendingRequests,
+                        rideTitles = buildRideRequestTitles(context, pendingRequests),
+                        pendingSyncRequestIds = pendingRequests.map { it.id }.toSet(),
+                        errorMessage = null
                     )
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = exception.message ?: "Could not load ride requests."
+                        )
+                    }
                 }
             }
         }
@@ -128,6 +151,11 @@ class MyRideRequestsViewModel(
     }
 
     fun toggleMatches(context: Context, requestId: String) {
+        if (requestId in _uiState.value.pendingSyncRequestIds) {
+            _uiState.update { it.copy(matchErrorMessage = "Send this request to the server before viewing matches.") }
+            return
+        }
+
         val passengerId = supabase.auth.currentUserOrNull()?.id
 
         if (passengerId == null) {
@@ -188,6 +216,71 @@ class MyRideRequestsViewModel(
                 }
             }
         }
+    }
+
+    fun syncPendingRequest(context: Context, requestId: String) {
+        val request = _uiState.value.requests.firstOrNull { it.id == requestId } ?: return
+
+        if (requestId !in _uiState.value.pendingSyncRequestIds || _uiState.value.syncingRequestId != null) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    syncingRequestId = requestId,
+                    errorMessage = null,
+                    matchErrorMessage = null
+                )
+            }
+
+            when (val result = repository.syncPendingRequest(request.toEntity())) {
+                is GenericResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            syncingRequestId = null,
+                            pendingSyncRequestIds = it.pendingSyncRequestIds - requestId,
+                            rideTitles = it.rideTitles + buildRideRequestTitles(context, listOf(request)),
+                            errorMessage = null
+                        )
+                    }
+                }
+
+                is GenericResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            syncingRequestId = null,
+                            errorMessage = result.error.toMessage("Could not send ride request.")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun deletePendingRequest(requestId: String) {
+        if (requestId !in _uiState.value.pendingSyncRequestIds || _uiState.value.syncingRequestId == requestId) {
+            return
+        }
+
+        viewModelScope.launch {
+            rideRequestRepositoryDeletePending(requestId)
+            nextMatchPageByRequest.remove(requestId)
+            _uiState.update {
+                it.copy(
+                    requests = it.requests.filterNot { request -> request.id == requestId },
+                    rideTitles = it.rideTitles - requestId,
+                    pendingSyncRequestIds = it.pendingSyncRequestIds - requestId,
+                    expandedRequestId = if (it.expandedRequestId == requestId) null else it.expandedRequestId,
+                    errorMessage = null,
+                    matchErrorMessage = null
+                )
+            }
+        }
+    }
+
+    private suspend fun rideRequestRepositoryDeletePending(requestId: String) {
+        repository.deletePendingRequest(requestId)
     }
 
     fun loadMoreMatches(context: Context, requestId: String) {
@@ -342,6 +435,15 @@ class MyRideRequestsViewModel(
             .getFutureRequestsByPassenger(passengerId, after, from, to)
             .getOrThrow("Could not load ride requests.")
             .map { it.toDomain() }
+    }
+
+    private fun mergePendingAndSyncedRequests(
+        pendingRequests: List<RideRequest>,
+        syncedRequests: List<RideRequest>
+    ): List<RideRequest> {
+        val pendingIds = pendingRequests.map { it.id }.toSet()
+        return (pendingRequests + syncedRequests.filterNot { it.id in pendingIds })
+            .sortedBy { it.desiredDepartureTimeMillis }
     }
 
     private suspend fun loadMatchesPage(requestId: String, passengerId: String, page: Int): MatchPage {

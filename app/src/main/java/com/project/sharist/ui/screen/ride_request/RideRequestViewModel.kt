@@ -3,8 +3,12 @@ package com.project.sharist.ui.screen.ride_request
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.project.sharist.data.mapper.toDomain
+import com.project.sharist.data.mapper.toEntity
 import com.project.sharist.data.model.GenericResult
 import com.project.sharist.data.model.toMessage
+import com.project.sharist.data.repository.RideRequestInsertResult
+import com.project.sharist.data.repository.RideRequestRepository
 import com.project.sharist.data.usecase.ride.InsertRideRequestUseCase
 import com.project.sharist.domain.model.LatLng
 import com.project.sharist.supabase
@@ -19,22 +23,63 @@ import java.util.UUID
 import kotlinx.coroutines.launch
 
 class RideRequestViewModel(
-    private val insertRideRequestUseCase: InsertRideRequestUseCase
+    private val insertRideRequestUseCase: InsertRideRequestUseCase,
+    private val rideRequestRepository: RideRequestRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow(RideRequestUiState())
     val state: StateFlow<RideRequestUiState> = _state
 
-    fun updateDepartureAddress(value: String) = _state.update { it.copy(departureAddress = value, saved = false) }
-    fun updateDepartureLat(value: String) = _state.update { it.copy(departureLat = value, saved = false) }
-    fun updateDepartureLng(value: String) = _state.update { it.copy(departureLng = value, saved = false) }
-    fun updateDepartureRadiusMeters(value: String) = _state.update { it.copy(departureRadiusMeters = value, saved = false) }
-    fun updateArrivalAddress(value: String) = _state.update { it.copy(arrivalAddress = value, saved = false) }
-    fun updateArrivalLat(value: String) = _state.update { it.copy(arrivalLat = value, saved = false) }
-    fun updateArrivalLng(value: String) = _state.update { it.copy(arrivalLng = value, saved = false) }
-    fun updateArrivalRadiusMeters(value: String) = _state.update { it.copy(arrivalRadiusMeters = value, saved = false) }
-    fun updateDesiredDepartureTimeMillis(value: Long) = _state.update { it.copy(desiredDepartureTimeMillis = value, saved = false) }
-    fun updateDepartureToleranceMinutes(value: String) = _state.update { it.copy(departureToleranceMinutes = value, saved = false) }
-    fun updateRecurringType(value: RecurringType) = _state.update { it.copy(recurringType = value, saved = false) }
+    fun updateDepartureAddress(value: String) = _state.update { it.copy(departureAddress = value, saved = false, saveResult = null) }
+    fun updateDepartureLat(value: String) = _state.update { it.copy(departureLat = value, saved = false, saveResult = null) }
+    fun updateDepartureLng(value: String) = _state.update { it.copy(departureLng = value, saved = false, saveResult = null) }
+    fun updateDepartureRadiusMeters(value: String) = _state.update { it.copy(departureRadiusMeters = value, saved = false, saveResult = null) }
+    fun updateArrivalAddress(value: String) = _state.update { it.copy(arrivalAddress = value, saved = false, saveResult = null) }
+    fun updateArrivalLat(value: String) = _state.update { it.copy(arrivalLat = value, saved = false, saveResult = null) }
+    fun updateArrivalLng(value: String) = _state.update { it.copy(arrivalLng = value, saved = false, saveResult = null) }
+    fun updateArrivalRadiusMeters(value: String) = _state.update { it.copy(arrivalRadiusMeters = value, saved = false, saveResult = null) }
+    fun updateDesiredDepartureTimeMillis(value: Long) = _state.update { it.copy(desiredDepartureTimeMillis = value, saved = false, saveResult = null) }
+    fun updateDepartureToleranceMinutes(value: String) = _state.update { it.copy(departureToleranceMinutes = value, saved = false, saveResult = null) }
+    fun updateRecurringType(value: RecurringType) = _state.update { it.copy(recurringType = value, saved = false, saveResult = null) }
+
+    fun loadPendingRequest(requestId: String) {
+        if (_state.value.editingPendingRequestId == requestId) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true, errorMessage = null) }
+
+            val request = rideRequestRepository.getPendingRequest(requestId)?.toDomain()
+
+            if (request == null) {
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Pending ride request was not found."
+                    )
+                }
+                return@launch
+            }
+
+            _state.update {
+                it.copy(
+                    editingPendingRequestId = request.id,
+                    editingCreatedAt = request.createdAt,
+                    departureLat = request.departure.latitude.toString(),
+                    departureLng = request.departure.longitude.toString(),
+                    departureRadiusMeters = request.departureRadiusMeters.toString(),
+                    arrivalLat = request.arrival.latitude.toString(),
+                    arrivalLng = request.arrival.longitude.toString(),
+                    arrivalRadiusMeters = request.arrivalRadiusMeters.toString(),
+                    desiredDepartureTimeMillis = request.desiredDepartureTimeMillis,
+                    departureToleranceMinutes = request.departureToleranceMinutes.toString(),
+                    recurringType = request.recurringType,
+                    isLoading = false,
+                    errorMessage = null,
+                    saved = false,
+                    saveResult = null
+                )
+            }
+        }
+    }
 
     fun searchDepartureAddress(context: Context) {
         launchAddressSearch(
@@ -76,10 +121,28 @@ class RideRequestViewModel(
         viewModelScope.launch {
             val request = state.value.toRideRequestOrError() ?: return@launch
 
-            _state.update { it.copy(isLoading = true, errorMessage = null, saved = false) }
+            _state.update { it.copy(isLoading = true, errorMessage = null, saved = false, saveResult = null) }
+
+            if (state.value.editingPendingRequestId != null) {
+                rideRequestRepository.savePendingRequest(request.toEntity())
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        saved = true,
+                        saveResult = RideRequestInsertResult.PendingSync
+                    )
+                }
+                return@launch
+            }
 
             when (val result = insertRideRequestUseCase(request)) {
-                is GenericResult.Success -> _state.update { it.copy(isLoading = false, saved = true) }
+                is GenericResult.Success -> _state.update {
+                    it.copy(
+                        isLoading = false,
+                        saved = true,
+                        saveResult = result.data
+                    )
+                }
                 is GenericResult.Error -> _state.update {
                     it.copy(
                         isLoading = false,
@@ -118,7 +181,7 @@ class RideRequestViewModel(
         }
 
         return RideRequest(
-            id = UUID.randomUUID().toString(),
+            id = editingPendingRequestId ?: UUID.randomUUID().toString(),
             passengerId = passengerId ?: return null,
             departure = LatLng(departureLatValue ?: return null, departureLngValue ?: return null),
             departureRadiusMeters = departureRadiusValue ?: return null,
@@ -126,7 +189,8 @@ class RideRequestViewModel(
             arrivalRadiusMeters = arrivalRadiusValue ?: return null,
             desiredDepartureTimeMillis = departureTime ?: return null,
             departureToleranceMinutes = departureToleranceValue ?: return null,
-            recurringType = recurringType
+            recurringType = recurringType,
+            createdAt = editingCreatedAt
         )
     }
 }

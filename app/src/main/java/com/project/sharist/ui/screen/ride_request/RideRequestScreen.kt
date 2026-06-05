@@ -29,7 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.project.sharist.data.repository.RideRequestRepository
+import com.project.sharist.data.repository.RideRequestInsertResult
+import com.project.sharist.data.repository.cachedRideRequestRepository
 import com.project.sharist.data.usecase.ride.InsertRideRequestUseCase
 import com.project.sharist.domain.model.RecurringType
 import java.text.SimpleDateFormat
@@ -39,6 +40,7 @@ import java.util.Locale
 @Composable
 fun RideRequestScreen(
     onRideRequestSaved: () -> Unit = {},
+    pendingRequestId: String? = null,
     viewModel: RideRequestViewModel = rideRequestViewModel()
 ) {
     val context = LocalContext.current
@@ -50,9 +52,24 @@ fun RideRequestScreen(
         }
     }
 
+    LaunchedEffect(pendingRequestId) {
+        pendingRequestId?.let(viewModel::loadPendingRequest)
+    }
+
     LaunchedEffect(state.saved) {
         if (state.saved) {
-            Toast.makeText(context, "Ride request created.", Toast.LENGTH_SHORT).show()
+            val message = when (state.saveResult) {
+                RideRequestInsertResult.PendingSync -> {
+                    if (state.editingPendingRequestId != null) {
+                        "Ride request changes saved."
+                    } else {
+                        "Ride request saved offline."
+                    }
+                }
+                RideRequestInsertResult.Synced,
+                null -> "Ride request created."
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             onRideRequestSaved()
         }
     }
@@ -64,7 +81,10 @@ fun RideRequestScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Create ride request", style = MaterialTheme.typography.headlineLarge)
+        Text(
+            if (pendingRequestId == null) "Create ride request" else "Edit ride request",
+            style = MaterialTheme.typography.headlineLarge
+        )
 
         AddressSection(
             title = "Departure",
@@ -138,7 +158,7 @@ fun RideRequestScreen(
             if (state.isLoading) {
                 CircularProgressIndicator()
             } else {
-                Text("Create request")
+                Text(if (pendingRequestId == null) "Create request" else "Save changes")
             }
         }
     }
@@ -288,13 +308,15 @@ private fun Long.formatDateTime(): String {
 
 @Composable
 private fun rideRequestViewModel(): RideRequestViewModel {
-    val insertRideRequestUseCase = remember {
+    val context = LocalContext.current
+    val rideRequestRepository = remember(context) { cachedRideRequestRepository(context) }
+    val insertRideRequestUseCase = remember(context) {
         InsertRideRequestUseCase(
-            RideRequestRepository()
+            rideRequestRepository
         )
     }
 
     return viewModel(
-        factory = RideRequestViewModelFactory(insertRideRequestUseCase)
+        factory = RideRequestViewModelFactory(insertRideRequestUseCase, rideRequestRepository)
     )
 }

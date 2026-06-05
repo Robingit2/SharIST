@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.project.sharist.data.repository.cachedRideOfferRepository
+import com.project.sharist.data.repository.cachedRideRequestRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RideOffer
 import com.project.sharist.domain.model.RideRequest
@@ -36,12 +37,15 @@ import java.util.Locale
 @Composable
 fun MyRideRequestsScreen(
     onDriverClick: (String) -> Unit,
+    onEditPendingRequestClick: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val rideRequestRepository = remember(context) { cachedRideRequestRepository(context) }
     val rideOfferRepository = remember(context) { cachedRideOfferRepository(context) }
     val userRepository = remember(context) { cachedUserRepository(context) }
     val viewModel: MyRideRequestsViewModel = viewModel(
         factory = MyRideRequestsViewModelFactory(
+            rideRequestRepository = rideRequestRepository,
             rideOfferRepository = rideOfferRepository,
             userRepository = userRepository
         )
@@ -60,13 +64,16 @@ fun MyRideRequestsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("My ride requests", style = MaterialTheme.typography.headlineLarge)
+        if (state.errorMessage != null && state.requests.isNotEmpty()) {
+            Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+        }
 
         when {
             state.isLoading -> {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             }
 
-            state.errorMessage != null -> {
+            state.errorMessage != null && state.requests.isEmpty() -> {
                 Text(state.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
                 OutlinedButton(onClick = { viewModel.loadRequests(context) }) {
                     Text("Retry")
@@ -90,10 +97,15 @@ fun MyRideRequestsScreen(
                             offerTitles = state.matchedOfferTitles,
                             driverNames = state.driverNames,
                             reservationCounts = state.reservationCounts,
+                            isPendingSync = request.id in state.pendingSyncRequestIds,
+                            isSyncing = state.syncingRequestId == request.id,
                             isLoadingMoreMatches = state.loadingMoreMatchesRequestId == request.id,
                             hasMoreMatches = state.hasMoreMatchesByRequest[request.id] == true,
                             bookingOfferId = state.bookingOfferId,
                             onShowMatchesClick = { viewModel.toggleMatches(context, request.id) },
+                            onSyncClick = { viewModel.syncPendingRequest(context, request.id) },
+                            onEditClick = { onEditPendingRequestClick(request.id) },
+                            onDeleteClick = { viewModel.deletePendingRequest(request.id) },
                             onLoadMoreMatchesClick = { viewModel.loadMoreMatches(context, request.id) },
                             onDriverClick = onDriverClick,
                             onBookClick = { offer -> pendingPayment = request.id to offer }
@@ -144,10 +156,15 @@ private fun RideRequestItem(
     offerTitles: Map<String, String>,
     driverNames: Map<String, String>,
     reservationCounts: Map<String, Int>,
+    isPendingSync: Boolean,
+    isSyncing: Boolean,
     isLoadingMoreMatches: Boolean,
     hasMoreMatches: Boolean,
     bookingOfferId: String?,
     onShowMatchesClick: () -> Unit,
+    onSyncClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     onLoadMoreMatchesClick: () -> Unit,
     onDriverClick: (String) -> Unit,
     onBookClick: (RideOffer) -> Unit
@@ -167,17 +184,43 @@ private fun RideRequestItem(
             Text("Arrival radius: ${request.arrivalRadiusMeters} m")
             Text("Departure tolerance: ${request.departureToleranceMinutes} minutes")
             Text("Recurring: ${request.recurringType.name.lowercase().replaceFirstChar { it.titlecase() }}")
+            if (isPendingSync) {
+                Text("Pending sync", color = MaterialTheme.colorScheme.primary)
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                OutlinedButton(onClick = onShowMatchesClick) {
-                    Text(if (isExpanded) "Hide matches" else "Show matches")
+                if (isPendingSync) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = onEditClick,
+                            enabled = !isSyncing
+                        ) {
+                            Text("Edit")
+                        }
+                        OutlinedButton(
+                            onClick = onDeleteClick,
+                            enabled = !isSyncing
+                        ) {
+                            Text("Delete")
+                        }
+                        OutlinedButton(
+                            onClick = onSyncClick,
+                            enabled = !isSyncing
+                        ) {
+                            Text(if (isSyncing) "Sending..." else "Send")
+                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = onShowMatchesClick) {
+                        Text(if (isExpanded) "Hide matches" else "Show matches")
+                    }
                 }
             }
 
-            if (isExpanded) {
+            if (isExpanded && !isPendingSync) {
                 MatchesSection(
                     isLoading = isLoadingMatches,
                     errorMessage = matchErrorMessage,

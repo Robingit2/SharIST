@@ -366,8 +366,16 @@ private fun AppNavHost(
             )
         }
 
-        composable(Screen.RideRequest.route) {
+        composable(
+            route = "${Screen.RideRequest.route}?pendingRequestId={pendingRequestId}",
+            arguments = listOf(navArgument("pendingRequestId") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            })
+        ) { entry ->
             RideRequestScreen(
+                pendingRequestId = entry.arguments?.getString("pendingRequestId"),
                 onRideRequestSaved = {
                     navController.popBackStack()
                 }
@@ -386,6 +394,9 @@ private fun AppNavHost(
             MyRideRequestsScreen(
                 onDriverClick = { driverId ->
                     navController.navigate("${Screen.Profile.route}/$driverId")
+                },
+                onEditPendingRequestClick = { requestId ->
+                    navController.navigate("${Screen.RideRequest.route}?pendingRequestId=$requestId")
                 }
             )
         }
