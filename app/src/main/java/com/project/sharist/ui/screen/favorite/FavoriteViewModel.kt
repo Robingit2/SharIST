@@ -9,18 +9,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import android.util.Log
+import kotlinx.coroutines.flow.StateFlow
+
+enum class FavoriteDisplayMode {
+    NONE,
+    SINGLE,
+    ALL
+}
 class FavoriteViewModel : ViewModel() {
 
     private val repository = FavoriteRepository(supabase)
     private val _favorites = MutableStateFlow<List<FavoriteLocationEntity>>(emptyList())
     val favorites = _favorites.asStateFlow()
-
     private val _selectedLocation = MutableStateFlow<FavoriteLocationEntity?>(null)
     val selectedLocation = _selectedLocation.asStateFlow()
+    private val _displayMode = MutableStateFlow(FavoriteDisplayMode.NONE)
+    val displayMode: StateFlow<FavoriteDisplayMode> = _displayMode
 
-    fun selectFavorite(location: FavoriteLocationEntity) {
-        _selectedLocation.value = location
-    }
 
     fun loadFavorites(userId: String) {
         viewModelScope.launch {
@@ -56,4 +61,17 @@ class FavoriteViewModel : ViewModel() {
             }
         }
     }
+
+    fun showSingleFavorite(favorite: FavoriteLocationEntity) {
+        _selectedLocation.value = favorite
+        _displayMode.value = FavoriteDisplayMode.SINGLE
+    }
+    fun showAllFavorites() {
+        _displayMode.value = FavoriteDisplayMode.ALL
+    }
+
+    fun clearFavoritesFromMap() {
+        _displayMode.value = FavoriteDisplayMode.NONE
+    }
+
 }

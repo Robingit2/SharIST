@@ -41,10 +41,16 @@ import androidx.compose.material3.TextButton
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.MapEventsOverlay
 import com.project.sharist.ui.screen.favorite.FavoriteViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.project.sharist.ui.screen.favorite.FavoriteDisplayMode
 
+import androidx.core.graphics.drawable.DrawableCompat
+import com.project.sharist.data.model.favorite.FavoriteLocationEntity
+import org.osmdroid.views.overlay.infowindow.InfoWindow
+import android.widget.TextView
+import android.widget.FrameLayout
+import androidx.core.graphics.toColorInt
+import android.graphics.drawable.GradientDrawable
 
-import android.widget.Toast
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun OpenStreetMapView(
@@ -57,6 +63,7 @@ fun OpenStreetMapView(
     val permissionState = rememberPermissionState(
         Manifest.permission.ACCESS_FINE_LOCATION
     )
+
 
     LaunchedEffect(Unit) {
         if (!permissionState.status.isGranted) {
@@ -114,14 +121,30 @@ fun OpenStreetMapView(
     }
     //********************
     val selectedFavorite by favoriteViewModel.selectedLocation.collectAsState()
+    val favorites by favoriteViewModel.favorites.collectAsState()
+    val displayMode by favoriteViewModel.displayMode.collectAsState()
 
     var selectedPoint by remember { mutableStateOf<GeoPoint?>(null) }
     var showDialog by remember { mutableStateOf(false) }
-    val favoriteMarker = remember {
+    /*val favoriteMarker = remember {
         Marker(mapView).apply {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             title = "Favorite"
             isDraggable = true
+        }
+    }*/
+    val favoriteMarker = remember {
+        Marker(mapView).apply {
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            title = "Favorite"
+
+            // Get a NEW drawable instance
+            val newIcon = this.icon?.constantState?.newDrawable()?.mutate()
+
+            newIcon?.let {
+                DrawableCompat.setTint(it, android.graphics.Color.RED)
+                icon = it
+            }
         }
     }
 
@@ -129,9 +152,7 @@ fun OpenStreetMapView(
         object : Marker.OnMarkerDragListener {
 
             override fun onMarkerDrag(marker: Marker?) {}
-
             override fun onMarkerDragStart(marker: Marker?) {}
-
             override fun onMarkerDragEnd(marker: Marker?) {
                 marker?.position?.let {
                     selectedPoint = it
@@ -165,7 +186,7 @@ fun OpenStreetMapView(
             }
         )
     }
-    LaunchedEffect(selectedFavorite) {
+    /*LaunchedEffect(selectedFavorite) {
         selectedFavorite?.let { favorite ->
             val lat = favorite.latitude ?: return@let
             val lng = favorite.longitude ?: return@let
@@ -184,7 +205,49 @@ fun OpenStreetMapView(
 
             mapView.invalidate()
         }
+    }*/
+    LaunchedEffect(displayMode, favorites, selectedFavorite) {
+        // Remove existing favorite markers only
+        mapView.overlays.removeAll {
+            it is Marker && it.id?.startsWith("favorite_") == true
+        }
+
+        when (displayMode) {
+
+            FavoriteDisplayMode.NONE -> {
+                mapView.invalidate()
+            }
+
+            FavoriteDisplayMode.SINGLE -> {
+                selectedFavorite?.let { favorite ->
+                    val lat = favorite.latitude ?: return@let
+                    val lng = favorite.longitude ?: return@let
+
+                    val marker = createFavoriteMarker(
+                        mapView, favorite)
+
+                    mapView.overlays.add(marker)
+                    mapView.controller.setCenter(marker.position)
+                }
+            }
+
+            FavoriteDisplayMode.ALL -> {
+                favorites.forEach { favorite ->
+                    val lat = favorite.latitude ?: return@forEach
+                    val lng = favorite.longitude ?: return@forEach
+
+                    val marker = createFavoriteMarker(
+                        mapView, favorite)
+
+                    mapView.overlays.add(marker)
+                    mapView.controller.setCenter(marker.position)
+                }
+            }
+        }
+
+        mapView.invalidate()
     }
+
     //*************************
     // ---------------- LOCATION CALLBACK ----------------
     val locationCallback = remember {
@@ -318,7 +381,7 @@ fun OpenStreetMapView(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 12.dp)
-                .fillMaxWidth(0.85f)
+                .fillMaxWidth(0.70f)
         ) {
 
             weatherState.weather?.let { weather ->
@@ -349,7 +412,7 @@ fun OpenStreetMapView(
 
                             if (userId != null) {
                                 selectedPoint?.let { point ->
-                                    Log.d("FAV_INSERT", "Trying insert: name=$name lat=${userId} lng=${point.longitude}")
+                                   // Log.d("FAV_INSERT", "Trying insert: name=$name lat=${userId} lng=${point.longitude}")
                                     favoriteViewModel.addFavorite(
                                         userId = userId,
                                         name = name.trim(),
@@ -359,28 +422,77 @@ fun OpenStreetMapView(
                                 }
                             }
                             showDialog = false
+                            selectedPoint = null
+                            mapView.overlays.remove(favoriteMarker)
+                            mapView.invalidate()
                         }
                     ) {
                         Text("Save")
                     }
-                }
-                /*confirmButton = {
-                    TextButton(onClick = {
-                        selectedPoint?.let {
-                            Toast.makeText(context, "Clicked Save button", Toast.LENGTH_SHORT).show()
-                        }
-
-                        showDialog = false
-                    }) {
-                        Text("Save")
-                    }
-                }*/,
+                },
                 dismissButton = {
-                    TextButton(onClick = { showDialog = false }) {
+                    TextButton(
+                        onClick = {
+                            showDialog = false
+                            selectedPoint = null
+
+                            mapView.overlays.remove(favoriteMarker)
+                            mapView.invalidate()
+                        }
+                    ) {
                         Text("Cancel")
                     }
                 }
             )
         }
+    }
+
+}
+private fun createFavoriteMarker(
+    mapView: MapView,
+    favorite: FavoriteLocationEntity
+): Marker {
+
+    return Marker(mapView).apply {
+        id = "favorite_${favorite.id}"
+
+        position = GeoPoint(
+            favorite.latitude ?: 0.0,
+            favorite.longitude ?: 0.0
+        )
+
+        title = favorite.name ?: "Fav"
+
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+
+        icon?.let {
+            val drawable = it.constantState?.newDrawable()?.mutate()
+            drawable?.setTint(android.graphics.Color.RED)
+            icon = drawable
+        }
+
+        infoWindow = object : InfoWindow(
+            FrameLayout(mapView.context),
+            mapView
+        ) {
+            override fun onOpen(item: Any?) {
+                val marker = item as Marker
+
+                val tv = TextView(mapView.context).apply {
+                    text = marker.title
+                    textSize = 12f
+                    setPadding(10, 6, 10, 6)
+                    setTextColor(android.graphics.Color.BLACK)
+                    background = GradientDrawable().apply {
+                        setColor("#FFFFFF".toColorInt())
+                        cornerRadius = 12f
+                    }
+                }
+
+                mView = tv
+            }
+            override fun onClose() {}
+        }
+        showInfoWindow()
     }
 }

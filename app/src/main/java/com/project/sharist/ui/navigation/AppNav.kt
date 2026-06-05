@@ -274,13 +274,25 @@ fun AppNav() {
                     },
                     onFavoriteClick = { favorite ->
                         scope.launch { drawerState.close() }
-                        favoriteViewModel.selectFavorite(favorite)
+                        favoriteViewModel.showSingleFavorite(favorite)
                     },
                     onDeleteFavorite = { id ->
                         scope.launch {
                             val userId = supabase.auth.currentUserOrNull()?.id ?: return@launch
                             favoriteViewModel.removeFavorite(userId,id)
                         }
+                    },
+                    onShowSingleFavorite = { favorite ->
+                        scope.launch { drawerState.close() }
+                        favoriteViewModel.showSingleFavorite(favorite)
+                    },
+
+                    onShowAllFavorites = {
+                        scope.launch { drawerState.close() }
+                        favoriteViewModel.showAllFavorites()
+                    },
+                    onClearFavorites = {
+                        favoriteViewModel.clearFavoritesFromMap()
                     },
                     onLogoutClick = onLogout
                 )
@@ -479,7 +491,10 @@ private fun AppDrawerContent(
     onSwitchRoleClick: (RoleType) -> Unit,
     favorites: List<FavoriteLocationEntity>,
     onFavoriteClick: (FavoriteLocationEntity) -> Unit,
+    onShowAllFavorites: () -> Unit,
+    onShowSingleFavorite: (FavoriteLocationEntity) -> Unit,
     onDeleteFavorite: (Long) -> Unit,
+    onClearFavorites: () -> Unit,
 
     onLogoutClick: () -> Unit,
     //favoriteViewModel: FavoriteViewModel,
@@ -492,12 +507,22 @@ private fun AppDrawerContent(
             modifier = Modifier.padding(16.dp),
             style = MaterialTheme.typography.titleLarge
         )
-
-        DrawerItem("Home", onHomeClick)
-        Text("Favorites size: ${favorites.size}")
-        DrawerItem("Profile", onProfileClick)
-        DrawerItem("Settings", onSettingsClick)
-        DrawerItem("History", onHistoryClick)
+        DrawerItem("Home") {
+            onClearFavorites()
+            onHomeClick()
+        }
+        DrawerItem("Profile"){
+            onClearFavorites()
+            onProfileClick()
+        }
+        DrawerItem("Settings"){
+            onClearFavorites()
+            onSettingsClick()
+        }
+        DrawerItem("History"){
+            onClearFavorites()
+            onHistoryClick()
+        }
         DrawerItem(
             if (favoritesExpanded)
                 "- Favorite Locations"
@@ -510,28 +535,12 @@ private fun AppDrawerContent(
         Spacer(modifier = Modifier.height(8.dp))
         Divider()
         Spacer(modifier = Modifier.height(8.dp))
-        /*if (favoritesExpanded) {
-            Column {
-                favorites.forEach { favorite ->
-                    NavigationDrawerItem(
-                        modifier = Modifier.padding(start = 24.dp),
-                        label = {
-                            Text(favorite.name ?: "Unnamed")
-                        },
-                        selected = false,
-                        onClick = {
-                            onFavoriteClick(favorite)
-                        }
-                    )
-                }
-            }
-        }*/
         if (favoritesExpanded) {
             Column {
                 favorites.forEach { favorite ->
-
-                    var menuExpanded by remember { mutableStateOf(false) }
-
+                    var menuExpanded by rememberSaveable(favorite.id) {
+                        mutableStateOf(false)
+                    }
                     NavigationDrawerItem(
                         modifier = Modifier.padding(start = 24.dp),
                         label = {
@@ -539,12 +548,12 @@ private fun AppDrawerContent(
                         },
                         selected = false,
                         onClick = {
-                            onFavoriteClick(favorite)
+                            onFavoriteClick(favorite) // single focus
                         },
                         badge = {
                             Box {
                                 Text(
-                                    text = "..",
+                                    text = ":",
                                     modifier = Modifier
                                         .padding(8.dp)
                                         .clickable {
@@ -556,13 +565,30 @@ private fun AppDrawerContent(
                                     expanded = menuExpanded,
                                     onDismissRequest = { menuExpanded = false }
                                 ) {
+                                    //ALL on map
+                                    DropdownMenuItem(
+                                        text = { Text("View all on map") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onShowAllFavorites()
+                                        }
+                                    )
+
+                                    //Focus single
+                                    DropdownMenuItem(
+                                        text = { Text("View on Map") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onShowSingleFavorite(favorite)
+                                        }
+                                    )
+
+                                    // Delete
                                     DropdownMenuItem(
                                         text = { Text("Delete") },
                                         onClick = {
                                             menuExpanded = false
-                                            favorite.id?.let { id ->
-                                                onDeleteFavorite(id)
-                                            }
+                                            favorite.id?.let(onDeleteFavorite)
                                         }
                                     )
                                 }

@@ -32,7 +32,10 @@ fun HomeScreen(
 
         if (role == RoleType.PASSENGER) {
             Button(
-                onClick = onCreateRideRequestClick,
+                onClick = {
+                    favoriteViewModel.clearFavoritesFromMap()
+                    onCreateRideRequestClick()
+                },
                 Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
@@ -44,7 +47,10 @@ fun HomeScreen(
 
         if (role == RoleType.DRIVER) {
             Button(
-                onClick = onCreateRideOfferClick,
+                onClick = {
+                    favoriteViewModel.clearFavoritesFromMap()
+                    onCreateRideOfferClick()
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp)
