@@ -14,25 +14,30 @@ import okhttp3.Response
 import java.io.IOException
 import org.json.JSONObject
 import kotlin.collections.copy
+import com.project.sharist.BuildConfig
 
 
 class HomeViewModel : ViewModel() {
     private val _paymentState = MutableStateFlow(PaymentState())
     val paymentState: StateFlow<PaymentState> = _paymentState
     private val client = OkHttpClient()
+    private val paypalCreateOrderUrl = "${BuildConfig.SUPABASE_URL}/functions/v1/paypal-create-order"
+    private val paypalCaptureOrderUrl = "${BuildConfig.SUPABASE_URL}/functions/v1/capture-paypal-order"
+    private val paypalFunctionAuthKey = BuildConfig.PAYPAL_FUNCTION_AUTH_KEY
+
     fun createPayPalOrder(amount: Double) {
         _paymentState.value = PaymentState()
         val body = JSONObject().apply {
             put("amount", amount)
         }
         val request = Request.Builder()
-            .url("https://mntteedoykjrrxeklhlv.supabase.co/functions/v1/paypal-create-order")
+            .url(paypalCreateOrderUrl)
             .post(
                 body.toString()
                     .toRequestBody("application/json".toMediaType())
             )
-            .addHeader("apikey", "sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
-            .addHeader("Authorization", "Bearer sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
+            .addHeader("apikey", paypalFunctionAuthKey)
+            .addHeader("Authorization", "Bearer $paypalFunctionAuthKey")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -77,10 +82,10 @@ class HomeViewModel : ViewModel() {
         android.util.Log.d("PAYPAL", "Capturing: $orderId")
 
         val request = Request.Builder()
-            .url("https://mntteedoykjrrxeklhlv.supabase.co/functions/v1/capture-paypal-order")
+            .url(paypalCaptureOrderUrl)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .addHeader("apikey", "sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
-            .addHeader("Authorization", "Bearer sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
+            .addHeader("apikey", paypalFunctionAuthKey)
+            .addHeader("Authorization", "Bearer $paypalFunctionAuthKey")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -117,10 +122,10 @@ class HomeViewModel : ViewModel() {
         android.util.Log.d("PAYPAL", "Capturing: $orderId")
 
         val request = Request.Builder()
-            .url("https://mntteedoykjrrxeklhlv.supabase.co/functions/v1/capture-paypal-order")
+            .url(paypalCaptureOrderUrl)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .addHeader("apikey", "sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
-            .addHeader("Authorization", "Bearer sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
+            .addHeader("apikey", paypalFunctionAuthKey)
+            .addHeader("Authorization", "Bearer $paypalFunctionAuthKey")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -172,4 +177,3 @@ class HomeViewModel : ViewModel() {
         )
     }
 }
-

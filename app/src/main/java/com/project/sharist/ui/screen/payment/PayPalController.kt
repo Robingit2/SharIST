@@ -12,6 +12,7 @@ import java.io.IOException
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import android.util.Log
+import com.project.sharist.BuildConfig
 import com.project.sharist.ui.screen.home.PaymentState
 
 class PayPalController : ViewModel() {
@@ -25,6 +26,9 @@ class PayPalController : ViewModel() {
     private var isCreatingOrder = false
     private var lastOrderId: String? = null
     private var capturingOrderId: String? = null
+    private val paypalCreateOrderUrl = "${BuildConfig.SUPABASE_URL}/functions/v1/paypal-create-order"
+    private val paypalCaptureOrderUrl = "${BuildConfig.SUPABASE_URL}/functions/v1/capture-paypal-order"
+    private val paypalFunctionAuthKey = BuildConfig.PAYPAL_FUNCTION_AUTH_KEY
 
     fun createPayPalOrder(amount: Double) {
         Log.d("PAY_DEBUG", "HTTP Code:")
@@ -38,10 +42,10 @@ class PayPalController : ViewModel() {
         }
 
         val request = Request.Builder()
-            .url("https://mntteedoykjrrxeklhlv.supabase.co/functions/v1/paypal-create-order")
+            .url(paypalCreateOrderUrl)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .addHeader("apikey", "sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
-            .addHeader("Authorization", "Bearer sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
+            .addHeader("apikey", paypalFunctionAuthKey)
+            .addHeader("Authorization", "Bearer $paypalFunctionAuthKey")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -122,10 +126,10 @@ class PayPalController : ViewModel() {
         }
 
         val request = Request.Builder()
-            .url("https://mntteedoykjrrxeklhlv.supabase.co/functions/v1/capture-paypal-order")
+            .url(paypalCaptureOrderUrl)
             .post(body.toString().toRequestBody("application/json".toMediaType()))
-            .addHeader("apikey", "sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
-            .addHeader("Authorization", "Bearer sb_publishable_2BjsdexFlrJgN9gOQfiubg_N7vJLzP9")
+            .addHeader("apikey", paypalFunctionAuthKey)
+            .addHeader("Authorization", "Bearer $paypalFunctionAuthKey")
             .build()
 
         client.newCall(request).enqueue(object : Callback {

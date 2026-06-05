@@ -7,8 +7,10 @@ plugins {
     alias(libs.plugins.google.ksp)
 }
 
-val supabaseUrl : String = gradleLocalProperties(rootDir, providers).getProperty("SUPABASE_URL")
-val supabaseKey : String = gradleLocalProperties(rootDir, providers).getProperty("SUPABASE_KEY")
+val localProperties = gradleLocalProperties(rootDir, providers)
+val supabaseUrl: String = localProperties.getProperty("SUPABASE_URL")
+val supabaseKey: String = localProperties.getProperty("SUPABASE_KEY")
+val paypalFunctionAuthKey: String = localProperties.getProperty("PAYPAL_FUNCTION_AUTH_KEY", supabaseKey)
 
 android {
     namespace = "com.project.sharist"
@@ -29,6 +31,7 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
+        buildConfigField("String", "PAYPAL_FUNCTION_AUTH_KEY", "\"$paypalFunctionAuthKey\"")
     }
 
     buildTypes {
