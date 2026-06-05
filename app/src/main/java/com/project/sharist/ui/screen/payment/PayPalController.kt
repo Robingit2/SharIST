@@ -24,6 +24,7 @@ class PayPalController : ViewModel() {
     //  prevent duplicate order calls
     private var isCreatingOrder = false
     private var lastOrderId: String? = null
+    private var capturingOrderId: String? = null
 
     fun createPayPalOrder(amount: Double) {
         Log.d("PAY_DEBUG", "HTTP Code:")
@@ -108,6 +109,9 @@ class PayPalController : ViewModel() {
     fun capturePayment(orderId: String) {
 
         if (lastOrderId == orderId && _paymentState.value.isCompleted) return
+        if (capturingOrderId == orderId) return
+
+        capturingOrderId = orderId
         _paymentState.value = _paymentState.value.copy(
             isProcessing = true,
             error = null
@@ -130,10 +134,12 @@ class PayPalController : ViewModel() {
 
                 val json = JSONObject(response.body?.string() ?: "{}")
                 val status = json.optString("status")
+                capturingOrderId = null
 
                 scope.launch(Dispatchers.Main) {
 
                     if (status == "COMPLETED") {
+                        lastOrderId = orderId
 
                         _paymentState.value = _paymentState.value.copy(
                             isProcessing = false,
@@ -153,6 +159,7 @@ class PayPalController : ViewModel() {
             }
 
             override fun onFailure(call: Call, e: IOException) {
+                capturingOrderId = null
                 scope.launch(Dispatchers.Main) {
                     _paymentState.value = _paymentState.value.copy(
                         isProcessing = false,
@@ -168,6 +175,7 @@ class PayPalController : ViewModel() {
         )
     }
     fun clearPaymentResult() {
+        capturingOrderId = null
         _paymentState.value = PaymentState()
     }
     fun consumeApprovalUrl() {

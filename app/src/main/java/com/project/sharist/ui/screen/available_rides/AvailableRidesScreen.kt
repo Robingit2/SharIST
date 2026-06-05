@@ -458,11 +458,13 @@ fun PayPalPaymentDialog(
         val observer = LifecycleEventObserver { _, event ->
             if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
 
-            val data = activity?.intent?.data ?: return@LifecycleEventObserver
-            if (data.scheme != "myapp" || data.host != "paypal-success") return@LifecycleEventObserver
-
-            val returnedOrderId = data.getQueryParameter("token") ?: payState.orderId
-            activity.setIntent(Intent(activity.intent).setData(null))
+            val data = activity?.intent?.data
+            val returnedOrderId = if (data?.scheme == "myapp" && data.host == "paypal-success") {
+                activity.setIntent(Intent(activity.intent).setData(null))
+                data.getQueryParameter("token") ?: payState.orderId
+            } else {
+                payState.orderId.takeIf { payState.hasReturned }
+            }
 
             if (!returnedOrderId.isNullOrBlank() && !payState.isCompleted) {
                 payPalController.markReturned()
