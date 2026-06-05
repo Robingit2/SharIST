@@ -48,7 +48,6 @@ import com.project.sharist.data.model.favorite.FavoriteLocationEntity
 import org.osmdroid.views.overlay.infowindow.InfoWindow
 import android.widget.TextView
 import android.widget.FrameLayout
-import androidx.core.graphics.toColorInt
 import android.graphics.drawable.GradientDrawable
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -113,7 +112,13 @@ fun OpenStreetMapView(
     val marker = remember {
         Marker(mapView).apply {
             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            title = "You are here"
+            title = "You"
+            icon?.let {
+                val drawable = it.constantState?.newDrawable()?.mutate()
+                drawable?.setTint(android.graphics.Color.BLUE)
+                icon = drawable
+            }
+            showInfoWindow()
         }
     }
     var weatherLoaded by remember {
@@ -478,19 +483,29 @@ private fun createFavoriteMarker(
             override fun onOpen(item: Any?) {
                 val marker = item as Marker
 
-                val tv = TextView(mapView.context).apply {
-                    text = marker.title
-                    textSize = 12f
-                    setPadding(10, 6, 10, 6)
-                    setTextColor(android.graphics.Color.BLACK)
-                    background = GradientDrawable().apply {
-                        setColor("#FFFFFF".toColorInt())
-                        cornerRadius = 12f
-                    }
+                val container = FrameLayout(mapView.context).apply {
+                    setPadding(8, 4, 8, 4)
                 }
 
-                mView = tv
+                val tv = TextView(mapView.context).apply {
+                    text = marker.title
+                    textSize = 10f
+                    setTextColor(android.graphics.Color.BLACK)
+                    setPadding(6, 2, 6, 2)
+                }
+
+                val bg = GradientDrawable().apply {
+                    setColor(android.graphics.Color.WHITE)
+                    cornerRadius = 10f
+                    setStroke(1, android.graphics.Color.LTGRAY)
+                }
+
+                container.background = bg
+                container.addView(tv)
+
+                mView = container
             }
+
             override fun onClose() {}
         }
         showInfoWindow()
