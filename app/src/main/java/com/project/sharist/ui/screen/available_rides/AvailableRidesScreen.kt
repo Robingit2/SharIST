@@ -33,7 +33,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +66,7 @@ fun AvailableRidesScreen(
     )
     val state by viewModel.uiState.collectAsState()
     val resultsListState = rememberLazyListState()
+    var pendingPaymentOffer by remember { mutableStateOf<RideOffer?>(null) }
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisibleIndex = resultsListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
@@ -195,7 +198,7 @@ fun AvailableRidesScreen(
                         onDriverClick = onDriverClick,
                         isAlreadyBooked = offer.id in state.bookedOfferIds,
                         isBooking = state.isBooking,
-                        onBookClick = { viewModel.bookRide(offer.id) }
+                        onBookClick = { pendingPaymentOffer = offer }
                     )
                 }
 
@@ -213,6 +216,17 @@ fun AvailableRidesScreen(
                 }
             }
         }
+    }
+
+    pendingPaymentOffer?.let { offer ->
+        PayPalPaymentDialog(
+            offer = offer,
+            onDismiss = { pendingPaymentOffer = null },
+            onPaymentCompleted = {
+                pendingPaymentOffer = null
+                viewModel.bookRide(offer.id)
+            }
+        )
     }
 }
 
@@ -406,6 +420,7 @@ private fun Long.formatDateTime(): String {
 fun PayPalPaymentDialog(
     offer: RideOffer,
     onDismiss: () -> Unit,
+    onPaymentCompleted: () -> Unit,
     payPalController: PayPalController = viewModel()
 ) {
     val context = LocalContext.current
@@ -413,7 +428,7 @@ fun PayPalPaymentDialog(
 
     // Auto-create the PayPal order the moment this screen opens
     LaunchedEffect(Unit) {
-        payPalController.createPayPalOrder(offer.cost.toDouble())
+        payPalController.createPayPalOrder(offer.cost)
     }
 
     //Automatically open the browser when the PayPal URL arrives
@@ -431,7 +446,7 @@ fun PayPalPaymentDialog(
         if (payState.isCompleted) {
             Toast.makeText(context, "Payment Successful!", Toast.LENGTH_SHORT).show()
             payPalController.clearPaymentResult()
-            onDismiss()
+            onPaymentCompleted()
         }
     }
 

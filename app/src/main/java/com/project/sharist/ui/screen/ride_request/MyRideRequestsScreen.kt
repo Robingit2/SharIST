@@ -17,7 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +29,7 @@ import com.project.sharist.data.repository.cachedRideOfferRepository
 import com.project.sharist.data.repository.cachedUserRepository
 import com.project.sharist.domain.model.RideOffer
 import com.project.sharist.domain.model.RideRequest
+import com.project.sharist.ui.screen.available_rides.PayPalPaymentDialog
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -44,6 +47,7 @@ fun MyRideRequestsScreen(
         )
     )
     val state by viewModel.uiState.collectAsState()
+    var pendingPayment by remember { mutableStateOf<Pair<String, RideOffer>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadRequests(context)
@@ -92,7 +96,7 @@ fun MyRideRequestsScreen(
                             onShowMatchesClick = { viewModel.toggleMatches(context, request.id) },
                             onLoadMoreMatchesClick = { viewModel.loadMoreMatches(context, request.id) },
                             onDriverClick = onDriverClick,
-                            onBookClick = { offerId -> viewModel.bookMatchedRide(request.id, offerId) }
+                            onBookClick = { offer -> pendingPayment = request.id to offer }
                         )
                     }
 
@@ -116,6 +120,17 @@ fun MyRideRequestsScreen(
             }
         }
     }
+
+    pendingPayment?.let { (requestId, offer) ->
+        PayPalPaymentDialog(
+            offer = offer,
+            onDismiss = { pendingPayment = null },
+            onPaymentCompleted = {
+                pendingPayment = null
+                viewModel.bookMatchedRide(requestId, offer.id)
+            }
+        )
+    }
 }
 
 @Composable
@@ -135,7 +150,7 @@ private fun RideRequestItem(
     onShowMatchesClick: () -> Unit,
     onLoadMoreMatchesClick: () -> Unit,
     onDriverClick: (String) -> Unit,
-    onBookClick: (String) -> Unit
+    onBookClick: (RideOffer) -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -195,7 +210,7 @@ private fun MatchesSection(
     bookingOfferId: String?,
     onDriverClick: (String) -> Unit,
     onLoadMoreClick: () -> Unit,
-    onBookClick: (String) -> Unit
+    onBookClick: (RideOffer) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Matches", style = MaterialTheme.typography.titleMedium)
@@ -213,7 +228,7 @@ private fun MatchesSection(
                         freeSpots = (offer.vehicleCapacity - (reservationCounts[offer.id] ?: 0)).coerceAtLeast(0),
                         isBooking = bookingOfferId == offer.id,
                         onDriverClick = { onDriverClick(offer.driverId) },
-                        onBookClick = { onBookClick(offer.id) }
+                        onBookClick = { onBookClick(offer) }
                     )
                 }
 
